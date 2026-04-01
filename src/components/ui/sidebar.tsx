@@ -49,9 +49,9 @@ const Sidebar = React.forwardRef<HTMLDivElement, SidebarProps>(
       <div
         ref={ref}
         className={cn(
-          "relative h-full w-[--sidebar-width] flex-col bg-sidebar md:flex",
-          variant === "floating" && "m-2 rounded-lg border",
-          variant === "inset" && "m-2 rounded-lg border bg-background",
+          "relative h-full w-[--sidebar-width] flex-col bg-sidebar text-sidebar-foreground md:flex",
+          variant === "floating" && "m-2 rounded-lg border border-sidebar-border",
+          variant === "inset" && "m-2 rounded-lg border border-sidebar-border bg-background",
           !open && "hidden",
           className
         )}
@@ -189,9 +189,9 @@ const SidebarMenuButton = React.forwardRef<HTMLButtonElement, React.ButtonHTMLAt
       <Comp
         ref={ref}
         className={cn(
-          "peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm outline-none ring-sidebar-ring transition-[width,height,padding] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50",
+          "peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring disabled:pointer-events-none disabled:opacity-50",
           "group-data-[collapsible=icon]:!size-8 group-data-[collapsible=icon]:!p-2",
-          isActive && "bg-sidebar-accent text-sidebar-accent-foreground",
+          isActive && "bg-sidebar-accent text-sidebar-accent-foreground font-medium",
           className
         )}
         {...props}
