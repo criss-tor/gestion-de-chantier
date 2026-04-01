@@ -9,12 +9,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, Pencil, Trash2, Clock, User } from 'lucide-react';
 
 interface EmployeeTableProps {
@@ -85,24 +79,17 @@ export function EmployeeTable({
                 </TableCell>
                 <TableCell className="text-right font-semibold text-primary">{formatCurrency(totalCost)}</TableCell>
                 <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => onAddTime(employee)}>
-                        <Clock className="mr-2 h-4 w-4" />Ajouter des heures
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => onEdit(employee)}>
-                        <Pencil className="mr-2 h-4 w-4" />Modifier
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => onDelete(employee.id)} className="text-destructive focus:text-destructive">
-                        <Trash2 className="mr-2 h-4 w-4" />Supprimer
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button variant="ghost" size="icon" onClick={() => onAddTime(employee)} title="Ajouter des heures">
+                      <Clock className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => onEdit(employee)} title="Modifier">
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => onDelete(employee.id)} className="text-destructive hover:text-destructive" title="Supprimer">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             );
