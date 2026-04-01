@@ -1,0 +1,59 @@
+export interface Employee {
+  id: string;
+  nom: string;
+  prenom: string;
+  coutHoraire: number;
+  role: 'admin' | 'employe'; // nouveau champ pour le rôle
+  pin: string; // code PIN à 4 chiffres pour l'authentification
+}
+
+export interface HourCategory {
+  id: string;
+  nom: string;
+  pourcentage: number; // e.g. 50 = +50%, -25 = -25%, 0 = normal
+  isBureau?: boolean; // bureau hours are distributed proportionally across chantiers
+}
+
+export interface Chantier {
+  id: string;
+  nom: string;
+  description?: string;
+  devis?: number; // Montant prévu (devis) pour le chantier
+  heuresPrevues?: number; // Heures prévues pour le chantier
+}
+
+export interface TimeEntry {
+  id: string;
+  employeeId: string;
+  chantierId?: string; // optional for bureau entries
+  date: string;
+  heures: number;
+  description?: string;
+  hourCategoryId?: string;
+}
+
+export interface MaterialCost {
+  id: string;
+  chantierId: string;
+  date: string;
+  montant: number;
+  description: string;
+}
+
+export interface MonthlyReport {
+  mois: string;
+  annee: number;
+  totalHeures: number;
+  totalCout: number;
+}
+
+export interface ChantierStats {
+  chantierId: string;
+  chantierNom: string;
+  heures: number;
+  coutMain: number;
+  coutMateriel: number;
+  coutTotal: number;
+  heuresBureau: number;
+  coutBureau: number;
+}

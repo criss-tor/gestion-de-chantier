@@ -1,0 +1,19 @@
+﻿import { ReactNode } from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
+import { useEmployeeContext } from '@/contexts/EmployeeContext';
+
+interface RequireAdminProps {
+  children: ReactNode;
+}
+
+export function RequireAdmin({ children }: RequireAdminProps) {
+  const { currentEmployeeId } = useEmployeeContext();
+  const location = useLocation();
+
+  if (currentEmployeeId) {
+    // when in employee mode, redirect to /heures
+    return <Navigate to="/heures" state={{ from: location }} replace />;
+  }
+
+  return <>{children}</>;
+}

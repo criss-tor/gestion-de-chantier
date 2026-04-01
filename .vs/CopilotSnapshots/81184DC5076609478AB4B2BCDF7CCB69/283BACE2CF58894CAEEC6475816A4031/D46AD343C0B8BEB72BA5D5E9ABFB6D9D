@@ -1,0 +1,23 @@
+﻿import { ReactNode } from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
+import { useEmployeeContext } from '@/contexts/EmployeeContext';
+
+interface RequireAdminProps {
+  children: ReactNode;
+}
+
+export function RequireAdmin({ children }: RequireAdminProps) {
+  const { employees, currentEmployeeId } = useEmployeeContext();
+  const location = useLocation();
+
+  if (!currentEmployeeId) {
+    // Pas connecté, redirige vers login
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+  const user = employees.find(e => e.id === currentEmployeeId);
+  if (!user || user.role !== 'admin') {
+    // Employé connecté, accès refusé
+    return <Navigate to="/heures" state={{ from: location }} replace />;
+  }
+  return <>{children}</>;
+}
