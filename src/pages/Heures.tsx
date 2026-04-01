@@ -80,24 +80,32 @@ export default function Heures() {
     if (!selectedEmployeeId || !entryDate || !entryHeures) return;
     const heuresDecimal = parseFloat(entryHeures) + (parseFloat(entryMinutes || '0') / 60);
     
-    // Utiliser le mode hors-ligne si nécessaire
-    addTimeEntryOffline({
-      employeeId: selectedEmployeeId,
-      chantierId: selectedChantierId || undefined,
-      date: entryDate,
-      heures: heuresDecimal,
-      description: entryDesc || undefined,
-      hourCategoryId: selectedHourCategoryId || undefined,
-    });
+    if (isOffline) {
+      // Hors-ligne : sauvegarder localement
+      addTimeEntryOffline({
+        employeeId: selectedEmployeeId,
+        chantierId: selectedChantierId || undefined,
+        date: entryDate,
+        heures: heuresDecimal,
+        description: entryDesc || undefined,
+        hourCategoryId: selectedHourCategoryId || undefined,
+      });
+      alert('✅ Entrée sauvegardée localement. Elle sera synchronisée automatiquement lorsque vous serez en ligne.');
+    } else {
+      // En ligne : utiliser addTimeEntry du contexte pour mettre à jour le state
+      addTimeEntry({
+        employeeId: selectedEmployeeId,
+        chantierId: selectedChantierId || undefined,
+        date: entryDate,
+        heures: heuresDecimal,
+        description: entryDesc || undefined,
+        hourCategoryId: selectedHourCategoryId || undefined,
+      });
+    }
     
     setEntryHeures('8');
     setEntryMinutes('0');
     setEntryDesc('');
-    
-    // Si on est hors-ligne, montrer une notification
-    if (isOffline) {
-      alert('✅ Entrée sauvegardée localement. Elle sera synchronisée automatiquement lorsque vous serez en ligne.');
-    }
   };
 
   // Fonctions pour la modification
