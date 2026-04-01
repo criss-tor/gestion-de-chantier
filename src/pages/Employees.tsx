@@ -3,7 +3,6 @@ import { Employee, HourCategory } from '@/types/employee';
 import { useEmployeeContext } from '@/contexts/EmployeeContext';
 import { EmployeeTable } from '@/components/EmployeeTable';
 import { AddEmployeeDialog } from '@/components/AddEmployeeDialog';
-import { AddTimeEntryDialog } from '@/components/AddTimeEntryDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';

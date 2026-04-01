@@ -25,7 +25,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import { ChantierDetailDialog } from '@/components/ChantierDetailDialog';
 import { Plus, Trash2, Package, Clock, Hammer, TrendingUp, HardHat } from 'lucide-react';
-import { exportChantierReport } from '@/lib/backup';
 
 export default function Chantiers() {
   const {
@@ -66,9 +65,9 @@ export default function Chantiers() {
           <p className="text-muted-foreground">Suivi des coûts par chantier</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => exportChantierReport(chantiers, chantierStats)}>
+          <Button variant="outline" disabled>
             <TrendingUp className="mr-2 h-4 w-4" />
-            Exporter bilan
+            Exporter bilan (PDF)
           </Button>
           <Button variant="outline" onClick={() => setShowAddMaterial(true)}>
             <Package className="mr-2 h-4 w-4" />

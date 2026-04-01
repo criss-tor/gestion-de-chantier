@@ -41,6 +41,7 @@ export function PDFExportDialog({
 }: PDFExportDialogProps) {
   const [exportType, setExportType] = useState<'employee' | 'chantier' | 'global'>('employee');
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
+  const [selectedChantierId, setSelectedChantierId] = useState<string>('');
   const [selectedMonth, setSelectedMonth] = useState<string>(format(new Date(), 'yyyy-MM'));
   const [isExporting, setIsExporting] = useState(false);
 
@@ -81,12 +82,20 @@ export function PDFExportDialog({
           break;
           
         case 'chantier':
-          await pdfExportService.exportChantierReport(
-            chantiers,
-            timeEntries,
-            employees,
-            selectedMonth
-          );
+          if (!selectedChantierId) {
+            alert('Veuillez sélectionner un chantier');
+            return;
+          }
+          const chantier = chantiers.find(c => c.id === selectedChantierId);
+          if (chantier) {
+            await pdfExportService.exportChantierReport(
+              chantier,
+              timeEntries,
+              employees,
+              hourCategories,
+              selectedMonth
+            );
+          }
           break;
           
         case 'global':
@@ -203,6 +212,25 @@ export function PDFExportDialog({
             </div>
           )}
 
+          {/* Sélection du chantier (si type chantier) */}
+          {exportType === 'chantier' && (
+            <div className="space-y-2">
+              <Label>Chantier</Label>
+              <Select value={selectedChantierId} onValueChange={setSelectedChantierId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner un chantier" />
+                </SelectTrigger>
+                <SelectContent>
+                  {chantiers.map((chantier) => (
+                    <SelectItem key={chantier.id} value={chantier.id}>
+                      {chantier.nom}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {/* Statistiques */}
           <div className="bg-muted/50 p-4 rounded-lg">
             <h4 className="font-medium mb-2">Statistiques pour {format(new Date(selectedMonth + '-01'), 'MMMM yyyy', { locale: fr })}</h4>
@@ -215,6 +243,14 @@ export function PDFExportDialog({
                 <div>
                   <span className="text-muted-foreground">Entrées employé:</span>
                   <Badge variant="outline" className="ml-2">{employeeEntries.length}</Badge>
+                </div>
+              )}
+              {exportType === 'chantier' && selectedChantierId && (
+                <div>
+                  <span className="text-muted-foreground">Entrées chantier:</span>
+                  <Badge variant="outline" className="ml-2">
+                    {monthEntries.filter(e => e.chantierId === selectedChantierId).length}
+                  </Badge>
                 </div>
               )}
               <div>
@@ -239,7 +275,9 @@ export function PDFExportDialog({
           </Button>
           <Button 
             onClick={handleExport} 
-            disabled={isExporting || (exportType === 'employee' && !selectedEmployeeId)}
+            disabled={isExporting || 
+              (exportType === 'employee' && !selectedEmployeeId) ||
+              (exportType === 'chantier' && !selectedChantierId)}
             className="flex items-center gap-2"
           >
             <Download className="h-4 w-4" />

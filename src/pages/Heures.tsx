@@ -394,7 +394,7 @@ export default function Heures() {
                     <TableHead>Chantier</TableHead>
                     <TableHead>Categorie</TableHead>
                     <TableHead className="text-right">Heures</TableHead>
-                    <TableHead>Description</TableHead>
+                    <TableHead className="min-w-[200px]">Description</TableHead>
                     <TableHead className="w-[100px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
