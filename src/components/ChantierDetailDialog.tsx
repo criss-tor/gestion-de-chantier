@@ -218,6 +218,42 @@ export function ChantierDetailDialog({ chantierId, open, onOpenChange }: Chantie
           )}
         </div>
 
+        {/* Detail des entrées avec descriptions */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Clock className="h-4 w-4 text-muted-foreground" />
+            <h3 className="font-semibold text-sm">Détail des entrées</h3>
+            <Badge variant="secondary" className="ml-auto">{chantierEntries.length} entrées</Badge>
+          </div>
+          {chantierEntries.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-2">Aucune entrée d'heures</p>
+          ) : (
+            <div className="space-y-2 max-h-[200px] overflow-y-auto">
+              {chantierEntries
+                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                .map((entry) => {
+                  const emp = employees.find((e) => e.id === entry.employeeId);
+                  return (
+                    <div key={entry.id} className="flex flex-col bg-muted rounded-md p-2 text-sm gap-1">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{emp?.prenom} {emp?.nom}</span>
+                          <span className="text-muted-foreground text-xs">{entry.date}</span>
+                        </div>
+                        <span className="font-semibold text-primary">{entry.heures}h</span>
+                      </div>
+                      {entry.description && (
+                        <div className="text-xs text-muted-foreground italic">
+                          💬 {entry.description}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+            </div>
+          )}
+        </div>
+
         {/* Totals */}
         <div className="space-y-2 pt-3 border-t">
           <div className="flex items-center justify-between">

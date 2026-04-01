@@ -481,12 +481,19 @@ const Dashboard = () => {
                     const ch = entry.chantierId ? getChantierById(entry.chantierId) : null;
                     const catLabel = entry.chantierId ? ch?.nom : 'Bureau';
                     return (
-                      <div key={entry.id} className="text-xs bg-muted rounded-md p-1.5 flex justify-between items-center">
+                      <div key={entry.id} className="text-xs bg-muted rounded-md p-1.5 flex flex-col gap-0.5">
+                        <div className="flex justify-between items-center">
                           <div className="truncate">
                             <span className="font-medium">{emp?.prenom?.[0]}. {emp?.nom}</span>
                             <span className="text-muted-foreground"> — {catLabel}</span>
                           </div>
                           <span className="font-semibold text-primary ml-1 whitespace-nowrap">{entry.heures}h</span>
+                        </div>
+                        {entry.description && (
+                          <div className="text-xs text-muted-foreground italic truncate">
+                            💬 {entry.description}
+                          </div>
+                        )}
                         </div>);
 
                   })}
@@ -562,7 +569,8 @@ const Dashboard = () => {
                   const ch = entry.chantierId ? getChantierById(entry.chantierId) : null;
                   const cat = entry.hourCategoryId ? getHourCategoryById(entry.hourCategoryId) : null;
                   return (
-                    <div key={entry.id} className="flex items-center justify-between bg-muted rounded-md p-2 text-sm">
+                    <div key={entry.id} className="flex flex-col bg-muted rounded-md p-2 text-sm gap-1">
+                      <div className="flex items-center justify-between">
                           <div>
                             <span className="font-medium">{emp?.prenom} {emp?.nom}</span>
                             <span className="text-muted-foreground"> — {entry.chantierId ? ch?.nom : 'Bureau'} — {entry.heures}h</span>
@@ -571,6 +579,12 @@ const Dashboard = () => {
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => deleteTimeEntry(entry.id)}>
                         <Trash2 className="h-3.5 w-3.5 text-destructive" />
                       </Button>
+                    </div>
+                    {entry.description && (
+                      <div className="text-xs text-muted-foreground italic">
+                        💬 {entry.description}
+                      </div>
+                    )}
                     </div>);
 
                 })}
