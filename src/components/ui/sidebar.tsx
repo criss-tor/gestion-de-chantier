@@ -6,6 +6,20 @@ import { useIsMobile } from "@/hooks/use-mobile";
 const SIDEBAR_WIDTH = "16rem";
 const SIDEBAR_WIDTH_MOBILE = "18rem";
 
+const SidebarContext = React.createContext<{
+  state: "open" | "closed";
+  open: boolean;
+  setOpen: (open: boolean) => void;
+  isMobile: boolean;
+  toggleSidebar: () => void;
+}>({
+  state: "open",
+  open: true,
+  setOpen: () => {},
+  isMobile: false,
+  toggleSidebar: () => {},
+});
+
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
   side?: "left" | "right";
   variant?: "sidebar" | "floating" | "inset";
@@ -14,7 +28,7 @@ interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
 
 const Sidebar = React.forwardRef<HTMLDivElement, SidebarProps>(
   ({ className, side = "left", variant = "sidebar", collapsible = "offcanvas", ...props }, ref) => {
-    const isMobile = useIsMobile();
+    const { open, isMobile } = React.useContext(SidebarContext);
     
     if (isMobile && collapsible === "offcanvas") {
       return (
@@ -23,6 +37,7 @@ const Sidebar = React.forwardRef<HTMLDivElement, SidebarProps>(
           className={cn(
             "fixed inset-y-0 z-50 flex h-full w-[--sidebar-width] flex-col bg-sidebar",
             side === "left" ? "left-0" : "right-0",
+            !open && "translate-x-full",
             className
           )}
           {...props}
@@ -34,9 +49,10 @@ const Sidebar = React.forwardRef<HTMLDivElement, SidebarProps>(
       <div
         ref={ref}
         className={cn(
-          "relative hidden h-full w-[--sidebar-width] flex-col bg-sidebar md:flex",
+          "relative h-full w-[--sidebar-width] flex-col bg-sidebar md:flex",
           variant === "floating" && "m-2 rounded-lg border",
           variant === "inset" && "m-2 rounded-lg border bg-background",
+          !open && "hidden",
           className
         )}
         style={
@@ -53,7 +69,22 @@ const Sidebar = React.forwardRef<HTMLDivElement, SidebarProps>(
 Sidebar.displayName = "Sidebar";
 
 const SidebarProvider = ({ children }: { children: React.ReactNode }) => {
-  return <>{children}</>;
+  const [open, setOpen] = React.useState(true);
+  const isMobile = useIsMobile();
+  
+  const toggleSidebar = () => setOpen(!open);
+  
+  return (
+    <SidebarContext.Provider value={{ 
+      state: open ? "open" : "closed", 
+      open, 
+      setOpen, 
+      isMobile, 
+      toggleSidebar 
+    }}>
+      {children}
+    </SidebarContext.Provider>
+  );
 };
 
 const SidebarInset = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
@@ -240,16 +271,7 @@ const SidebarRail = React.forwardRef<HTMLButtonElement, React.ComponentProps<typ
 );
 SidebarRail.displayName = "SidebarRail";
 
-const useSidebar = () => ({
-  state: "open",
-  open: true,
-  setOpen: () => {},
-  openMobile: true,
-  setOpenMobile: () => {},
-  isMobile: false,
-  toggleSidebar: () => {},
-  toggleMobileSidebar: () => {},
-});
+const useSidebar = () => React.useContext(SidebarContext);
 
 export {
   Sidebar,
