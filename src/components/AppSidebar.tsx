@@ -2,6 +2,7 @@ import { Users, HardHat, LayoutDashboard, Clock } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
 import { useEmployeeContext } from '@/contexts/EmployeeContext';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 import {
   Sidebar,
@@ -27,12 +28,13 @@ export function AppSidebar() {
   const location = useLocation();
   const { currentEmployeeId, employees } = useEmployeeContext();
   const isActive = (path: string) => location.pathname === path;
+  const isMobile = useIsMobile();
   
   // Déterminer si on est en mode admin
   const isAdmin = currentEmployeeId === null || (currentEmployeeId && employees.find(e => e.id === currentEmployeeId)?.role === 'admin');
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar collapsible={isMobile ? "offcanvas" : "icon"}>
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
