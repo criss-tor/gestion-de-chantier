@@ -51,7 +51,6 @@ export default function Employees() {
 
   const [showAddEmployee, setShowAddEmployee] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
-  const [addingTimeFor, setAddingTimeFor] = useState<Employee | null>(null);
 
   // États pour les catégories d'heures
   const [showAddCategory, setShowAddCategory] = useState(false);
@@ -126,7 +125,6 @@ export default function Employees() {
           setShowAddEmployee(true);
         }}
         onDelete={deleteEmployee}
-        onAddTime={setAddingTimeFor}
       />
 
       <AddEmployeeDialog
@@ -137,15 +135,6 @@ export default function Employees() {
         }}
         onSave={handleSaveEmployee}
         employee={editingEmployee}
-      />
-
-      <AddTimeEntryDialog
-        open={!!addingTimeFor}
-        onOpenChange={(open) => !open && setAddingTimeFor(null)}
-        onSave={addTimeEntry}
-        employee={addingTimeFor}
-        chantiers={chantiers}
-        hourCategories={hourCategories}
       />
 
       {/* Section Catégories d'heures */}
