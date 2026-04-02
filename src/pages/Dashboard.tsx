@@ -559,9 +559,9 @@ const Dashboard = () => {
           <div className="grid gap-4 py-2">
             {!isBureauSelected &&
             <div className="grid gap-2">
-                <Label>Chantier</Label>
+                <Label className="text-base">Chantier</Label>
                 <Select value={selectedChantierId} onValueChange={setSelectedChantierId}>
-                  <SelectTrigger><SelectValue placeholder="Sélectionner un chantier" /></SelectTrigger>
+                  <SelectTrigger className="h-12"><SelectValue placeholder="Sélectionner un chantier" /></SelectTrigger>
                   <SelectContent>
                     {chantiers.map((ch) =>
                   <SelectItem key={ch.id} value={ch.id}>{ch.nom}</SelectItem>
@@ -578,9 +578,9 @@ const Dashboard = () => {
             }
 
             <div className="grid gap-2">
-              <Label>Employé</Label>
+              <Label className="text-base">Employé</Label>
               <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
-                <SelectTrigger><SelectValue placeholder="Sélectionner un employé" /></SelectTrigger>
+                <SelectTrigger className="h-12"><SelectValue placeholder="Sélectionner un employé" /></SelectTrigger>
                 <SelectContent>
                   {employees.map((emp) =>
                   <SelectItem key={emp.id} value={emp.id}>{emp.prenom} {emp.nom}</SelectItem>
@@ -590,14 +590,14 @@ const Dashboard = () => {
             </div>
 
             <div className="grid gap-2">
-              <Label>Catégorie d'heures</Label>
+              <Label className="text-base">Catégorie d'heures</Label>
               <Select value={selectedHourCategoryId} onValueChange={(val) => {
                 setSelectedHourCategoryId(val);
                 // Clear chantier when switching to bureau
                 const cat = hourCategories.find((c) => c.id === val);
                 if (cat?.isBureau) setSelectedChantierId('');
               }}>
-                <SelectTrigger><SelectValue placeholder="Sélectionner une catégorie" /></SelectTrigger>
+                <SelectTrigger className="h-12"><SelectValue placeholder="Sélectionner une catégorie" /></SelectTrigger>
                 <SelectContent>
                   {hourCategories.map((cat) =>
                   <SelectItem key={cat.id} value={cat.id}>
@@ -609,8 +609,8 @@ const Dashboard = () => {
             </div>
 
             <div className="grid gap-2">
-              <Label>Nombre d'heures</Label>
-              <Input type="number" step="0.5" value={heures} onChange={(e) => setHeures(e.target.value)} placeholder="8" />
+              <Label className="text-base">Nombre d'heures</Label>
+              <Input type="number" step="0.5" value={heures} onChange={(e) => setHeures(e.target.value)} placeholder="8" className="h-12 text-lg" />
             </div>
 
             {previewCost !== null &&
@@ -621,14 +621,14 @@ const Dashboard = () => {
             }
 
             <div className="grid gap-2">
-              <Label>Résumé (optionnel)</Label>
-              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description du travail effectué..." rows={2} />
+              <Label className="text-base">Résumé (optionnel)</Label>
+              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description du travail effectué..." rows={3} className="resize-none text-base" />
             </div>
           </div>
 
           <DialogFooter>
-            <Button onClick={handleAddEntry} disabled={!isBureauSelected && !selectedChantierId || !selectedEmployeeId || !heures}>
-              <Plus className="mr-2 h-4 w-4" />Ajouter
+            <Button onClick={handleAddEntry} disabled={!isBureauSelected && !selectedChantierId || !selectedEmployeeId || !heures} className="h-12 px-6 text-base">
+              <Plus className="mr-2 h-5 w-5" />Ajouter
             </Button>
           </DialogFooter>
         </DialogContent>
