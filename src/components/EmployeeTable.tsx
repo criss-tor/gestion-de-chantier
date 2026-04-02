@@ -34,11 +34,15 @@ export function EmployeeTable({
 }: EmployeeTableProps) {
   const isMobile = useIsMobile();
   
+  // Forcer la vue mobile pour tester (à commenter après)
+  const forceMobile = true;
+  const showMobileView = forceMobile || isMobile;
+  
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat('fr-CH', { style: 'currency', currency: 'CHF' }).format(amount);
 
   // Vue Mobile: Cartes optimisées
-  if (isMobile) {
+  if (showMobileView) {
     return (
       <div className="space-y-3">
         {employees.map((employee) => {
