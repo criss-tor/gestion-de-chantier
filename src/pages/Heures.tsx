@@ -26,8 +26,11 @@ import { formatHoursDecimalWithH } from '@/lib/utils';
 import { startOfWeek, addDays, format, isSameMonth, parseISO, subWeeks, addWeeks } from 'date-fns';
 import { useOfflineSync } from '@/hooks/useOfflineSync';
 import { OfflineIndicator } from '@/components/OfflineIndicator';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export default function Heures() {
+  const isMobile = useIsMobile();
+  
   const {
     employees,
     chantiers,
@@ -50,104 +53,32 @@ export default function Heures() {
     needsSync
   } = useOfflineSync();
 
-  const currentEmployee = currentEmployeeId ? employees.find((e) => e.id === currentEmployeeId) : null;
-  const isAdmin = currentEmployee?.role === 'admin';
-
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState(currentEmployeeId ?? employees[0]?.id ?? '');
-  const [selectedChantierId, setSelectedChantierId] = useState(chantiers[0]?.id ?? '');
-  const [selectedHourCategoryId, setSelectedHourCategoryId] = useState(hourCategories[0]?.id ?? '');
+  // États pour le formulaire
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState(currentEmployeeId || '');
+  const [selectedChantierId, setSelectedChantierId] = useState('');
+  const [selectedHourCategoryId, setSelectedHourCategoryId] = useState('');
   const [entryDate, setEntryDate] = useState(new Date().toISOString().slice(0, 10));
   const [entryHeures, setEntryHeures] = useState('8');
   const [entryMinutes, setEntryMinutes] = useState('0');
-  const [entryDesc, setEntryDesc] = useState('');
-  const [currentWeekOffset, setCurrentWeekOffset] = useState(0);
-  
-  // États pour la pagination et la modification
-  const [currentPage, setCurrentPage] = useState(1);
-  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [entryDescription, setEntryDescription] = useState('');
   const [editingEntry, setEditingEntry] = useState<any>(null);
-  const entriesPerPage = 10;
+  const [showEditDialog, setShowEditDialog] = useState(false);
 
-  useEffect(() => {
-    if (isAdmin) {
-      setSelectedEmployeeId(currentEmployeeId ?? employees[0]?.id ?? '');
-    } else {
-      setSelectedEmployeeId(currentEmployeeId ?? '');
-    }
-  }, [currentEmployeeId, employees, isAdmin]);
+  // États pour la pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [entriesPerPage] = useState(isMobile ? 5 : 10);
+  const [currentWeekOffset, setCurrentWeekOffset] = useState(0);
 
-  const handleAddEntry = () => {
-    if (!selectedEmployeeId || !entryDate || !entryHeures) return;
-    const heuresDecimal = parseFloat(entryHeures) + (parseFloat(entryMinutes || '0') / 60);
-    
-    if (isOffline) {
-      // Hors-ligne : sauvegarder localement
-      addTimeEntryOffline({
-        employeeId: selectedEmployeeId,
-        chantierId: selectedChantierId || undefined,
-        date: entryDate,
-        heures: heuresDecimal,
-        description: entryDesc || undefined,
-        hourCategoryId: selectedHourCategoryId || undefined,
-      });
-      alert('✅ Entrée sauvegardée localement. Elle sera synchronisée automatiquement lorsque vous serez en ligne.');
-    } else {
-      // En ligne : utiliser addTimeEntry du contexte pour mettre à jour le state
-      addTimeEntry({
-        employeeId: selectedEmployeeId,
-        chantierId: selectedChantierId || undefined,
-        date: entryDate,
-        heures: heuresDecimal,
-        description: entryDesc || undefined,
-        hourCategoryId: selectedHourCategoryId || undefined,
-      });
-    }
-    
-    setEntryHeures('8');
-    setEntryMinutes('0');
-    setEntryDesc('');
-  };
+  // Vérifier si l'utilisateur est admin
+  const currentEmployee = employees.find((e) => e.id === currentEmployeeId);
+  const isAdmin = currentEmployee?.role === 'admin';
 
-  // Fonctions pour la modification
-  const handleEditEntry = (entry: any) => {
-    setEditingEntry(entry);
-    setSelectedChantierId(entry.chantierId || '');
-    setSelectedHourCategoryId(entry.hourCategoryId || '');
-    setEntryDate(entry.date);
-    
-    // Convertir les heures décimales en heures et minutes
-    const totalHours = Math.floor(entry.heures);
-    const minutes = Math.round((entry.heures - totalHours) * 60);
-    setEntryHeures(totalHours.toString());
-    setEntryMinutes(minutes.toString());
-    setEntryDesc(entry.description || '');
-    setShowEditDialog(true);
-  };
+  // Filtrer les entrées pour l'employé sélectionné
+  const entriesForEmployee = selectedEmployeeId
+    ? timeEntries.filter((e) => e.employeeId === selectedEmployeeId)
+    : timeEntries;
 
-  const handleUpdateEntry = () => {
-    if (!editingEntry || !selectedEmployeeId || !entryDate || !entryHeures) return;
-    const heuresDecimal = parseFloat(entryHeures) + (parseFloat(entryMinutes || '0') / 60);
-    
-    // Supprimer l'ancienne entrée et en ajouter une nouvelle
-    deleteTimeEntry(editingEntry.id);
-    addTimeEntry({
-      employeeId: selectedEmployeeId,
-      chantierId: selectedChantierId || undefined,
-      date: entryDate,
-      heures: heuresDecimal,
-      description: entryDesc || undefined,
-      hourCategoryId: selectedHourCategoryId || undefined,
-    });
-    
-    setShowEditDialog(false);
-    setEditingEntry(null);
-    setEntryHeures('8');
-    setEntryMinutes('0');
-    setEntryDesc('');
-  };
-
-  const entriesForEmployee = timeEntries.filter((e) => e.employeeId === selectedEmployeeId);
-
+  // Calculs pour les statistiques
   const today = new Date();
   const currentWeekDate = addWeeks(today, currentWeekOffset);
   const weekStart = startOfWeek(currentWeekDate, { weekStartsOn: 1 });
@@ -177,16 +108,94 @@ export default function Heures() {
     setCurrentPage(page);
   };
 
+  const handleAddEntry = async () => {
+    if (!selectedEmployeeId || !entryDate || (!entryHeures || entryHeures === '0')) return;
+
+    const totalHours = parseFloat(entryHeures) + (parseFloat(entryMinutes) || 0) / 60;
+    const newEntry = {
+      id: Date.now().toString(),
+      employeeId: selectedEmployeeId,
+      chantierId: selectedChantierId || null,
+      hourCategoryId: selectedHourCategoryId || null,
+      date: entryDate,
+      heures: totalHours,
+      description: entryDescription,
+    };
+
+    if (isOffline) {
+      addTimeEntryOffline(newEntry);
+    } else {
+      await addTimeEntry(newEntry);
+    }
+
+    // Réinitialiser le formulaire
+    setEntryDate(new Date().toISOString().slice(0, 10));
+    setEntryHeures('8');
+    setEntryMinutes('0');
+    setEntryDescription('');
+    setSelectedChantierId('');
+    setSelectedHourCategoryId('');
+  };
+
+  const handleEditEntry = (entry: any) => {
+    setEditingEntry(entry);
+    setSelectedEmployeeId(entry.employeeId);
+    setSelectedChantierId(entry.chantierId || '');
+    setSelectedHourCategoryId(entry.hourCategoryId || '');
+    setEntryDate(entry.date);
+    const hours = Math.floor(entry.heures);
+    const minutes = Math.round((entry.heures - hours) * 60);
+    setEntryHeures(hours.toString());
+    setEntryMinutes(minutes.toString());
+    setEntryDescription(entry.description || '');
+    setShowEditDialog(true);
+  };
+
+  const handleUpdateEntry = async () => {
+    if (!editingEntry || !selectedEmployeeId || !entryDate) return;
+
+    const totalHours = parseFloat(entryHeures) + (parseFloat(entryMinutes) || 0) / 60;
+    const updatedEntry = {
+      ...editingEntry,
+      employeeId: selectedEmployeeId,
+      chantierId: selectedChantierId || null,
+      hourCategoryId: selectedHourCategoryId || null,
+      date: entryDate,
+      heures: totalHours,
+      description: entryDescription,
+    };
+
+    await addTimeEntry(updatedEntry);
+    await deleteTimeEntry(editingEntry.id);
+    setShowEditDialog(false);
+    setEditingEntry(null);
+  };
+
+  const handleDeleteEntry = async (entryId: string) => {
+    if (confirm('Êtes-vous sûr de vouloir supprimer cette entrée ?')) {
+      await deleteTimeEntry(entryId);
+    }
+  };
+
+  const handleClearForm = () => {
+    setEntryDate(new Date().toISOString().slice(0, 10));
+    setEntryHeures('8');
+    setEntryMinutes('0');
+    setEntryDescription('');
+    setSelectedChantierId('');
+    setSelectedHourCategoryId('');
+  };
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className={`space-y-6 ${isMobile ? 'max-w-sm mx-auto' : ''}`}>
+      <div className={`flex items-center ${isMobile ? 'flex-col gap-3' : 'justify-between'}`}>
         <div>
-          <h1 className="text-2xl font-bold">Saisie des heures</h1>
-          <p className="text-muted-foreground">Enregistrez vos heures rapidement (chantier, catégorie, date).</p>
+          <h1 className={`font-bold ${isMobile ? 'text-xl' : 'text-2xl'}`}>Saisie des heures</h1>
+          <p className="text-muted-foreground text-sm">Enregistrez vos heures rapidement (chantier, catégorie, date).</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className={`flex items-center ${isMobile ? 'w-full' : 'gap-3'}`}>
           {currentEmployeeId && (
-            <div className="text-sm text-muted-foreground">
+            <div className={`text-sm text-muted-foreground ${isMobile ? 'text-center' : ''}`}>
               Connecté en tant que : <span className="font-semibold text-primary">{employees.find((e) => e.id === currentEmployeeId)?.prenom ?? ''} {employees.find((e) => e.id === currentEmployeeId)?.nom ?? ''}</span>
             </div>
           )}
@@ -201,304 +210,68 @@ export default function Heures() {
         </div>
       </div>
 
-      {/* Nouvelle entrée - déplacée en haut */}
+      {/* Nouvelle entrée */}
       <Card>
         <CardHeader>
-          <CardTitle>Nouvelle entrée</CardTitle>
+          <CardTitle className={isMobile ? 'text-lg' : ''}>Nouvelle entrée</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4">
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label>Employé</Label>
-                {isAdmin ? (
-                  <select
-                    className="input text-lg py-3 px-4"
-                    value={selectedEmployeeId}
-                    onChange={(e) => setSelectedEmployeeId(e.target.value)}
-                  >
-                    <option value="">Sélectionner un employé</option>
-                    {employees.map((emp) => (
-                      <option key={emp.id} value={emp.id}>{emp.prenom} {emp.nom}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <Input value={`${currentEmployee?.prenom ?? ''} ${currentEmployee?.nom ?? ''}`} disabled className="text-lg py-3 px-4" />
-                )}
-              </div>
-
-              <div className="grid gap-2">
-                <Label>Chantier</Label>
+          <div className={`grid gap-4 ${isMobile ? '' : 'md:grid-cols-2'}`}>
+            <div className="grid gap-2">
+              <Label className={isMobile ? 'text-base' : ''}>Employé</Label>
+              {isAdmin ? (
                 <select
-                  className="input text-lg py-3 px-4"
-                  value={selectedChantierId}
-                  onChange={(e) => setSelectedChantierId(e.target.value)}
+                  className={`input ${isMobile ? 'h-12 text-base' : 'text-lg py-3 px-4'}`}
+                  value={selectedEmployeeId}
+                  onChange={(e) => setSelectedEmployeeId(e.target.value)}
                 >
-                  <option value="">(Aucun)</option>
-                  {chantiers.map((ch) => (
-                    <option key={ch.id} value={ch.id}>{ch.nom}</option>
+                  <option value="">Sélectionner un employé</option>
+                  {employees.map((emp) => (
+                    <option key={emp.id} value={emp.id}>{emp.prenom} {emp.nom}</option>
                   ))}
                 </select>
-              </div>
-            </div>
-
-            <div className="grid gap-4">
-              <div className="grid gap-2">
-                <Label>Date</Label>
-                <Input type="date" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} className="text-lg py-3 px-4" />
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label>Heures</Label>
-                  <Input type="number" step="1" min="0" max="23" value={entryHeures} onChange={(e) => setEntryHeures(e.target.value)} className="text-lg py-3 px-4" placeholder="8" />
-                </div>
-                <div className="grid gap-2">
-                  <Label>Minutes</Label>
-                  <div className="flex gap-2">
-                    <Input type="number" step="15" min="0" max="59" value={entryMinutes} onChange={(e) => setEntryMinutes(e.target.value)} className="text-lg py-3 px-4 flex-1" placeholder="0" />
-                    <div className="flex gap-1">
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => setEntryMinutes('15')}
-                        className="px-2 py-1 text-xs"
-                      >
-                        15min
-                      </Button>
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => setEntryMinutes('30')}
-                        className="px-2 py-1 text-xs"
-                      >
-                        30min
-                      </Button>
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => setEntryMinutes('45')}
-                        className="px-2 py-1 text-xs"
-                      >
-                        45min
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="grid gap-2">
-                <Label>Catégorie</Label>
-                <select
-                  className="input text-lg py-3 px-4"
-                  value={selectedHourCategoryId}
-                  onChange={(e) => setSelectedHourCategoryId(e.target.value)}
-                >
-                  <option value="">Sélectionner</option>
-                  {hourCategories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>{cat.nom}</option>
-                  ))}
-                </select>
-              </div>
+              ) : (
+                <Input value={`${currentEmployee?.prenom ?? ''} ${currentEmployee?.nom ?? ''}`} disabled className={`${isMobile ? 'h-12 text-base' : 'text-lg py-3 px-4'}`} />
+              )}
             </div>
 
             <div className="grid gap-2">
-              <Label>Commentaire (optionnel)</Label>
-              <Input value={entryDesc} onChange={(e) => setEntryDesc(e.target.value)} placeholder="Ex. Pose de porte" className="text-lg py-3 px-4" />
-            </div>
-
-            <div className="flex justify-end">
-              <Button onClick={handleAddEntry} disabled={!selectedEmployeeId || !entryDate || !entryHeures} size="lg" className="text-lg py-3 px-6">
-                <Plus className="mr-2 h-5 w-5" />
-                Enregistrer {entryHeures}h{entryMinutes && entryMinutes !== '0' ? ` ${entryMinutes}min` : ''}
-              </Button>
+              <Label className={isMobile ? 'text-base' : ''}>Chantier</Label>
+              <select
+                className={`input ${isMobile ? 'h-12 text-base' : 'text-lg py-3 px-4'}`}
+                value={selectedChantierId}
+                onChange={(e) => setSelectedChantierId(e.target.value)}
+              >
+                <option value="">(Aucun)</option>
+                {chantiers.map((ch) => (
+                  <option key={ch.id} value={ch.id}>{ch.nom}</option>
+                ))}
+              </select>
             </div>
           </div>
-        </CardContent>
-      </Card>
 
-      {currentEmployeeId && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Heures cette semaine</CardTitle>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="icon" onClick={() => setCurrentWeekOffset(currentWeekOffset - 1)}>
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <span className="text-sm font-medium px-2">
-                    {currentWeekOffset === 0 ? 'Cette semaine' : 
-                     currentWeekOffset === -1 ? 'Semaine dernière' :
-                     currentWeekOffset === 1 ? 'Semaine prochaine' :
-                     `Semaine ${currentWeekOffset > 0 ? '+' : ''}${currentWeekOffset}`}
-                  </span>
-                  <Button variant="outline" size="icon" onClick={() => setCurrentWeekOffset(currentWeekOffset + 1)}>
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{formatHoursDecimalWithH(weekTotal)}</div>
-              <div className="text-sm text-muted-foreground">Semaine du {format(weekStart, 'd MMM yyyy')}</div>
-              <div className="mt-4 grid grid-cols-5 gap-2">
-                {hoursByDay.map(({ day, total }) => (
-                  <div key={day.toISOString()} className="text-center">
-                    <div className="text-xs text-muted-foreground">
-                      {format(day, 'EEEE').replace('Monday', 'Lundi')
-                        .replace('Tuesday', 'Mardi')
-                        .replace('Wednesday', 'Mercredi')
-                        .replace('Thursday', 'Jeudi')
-                        .replace('Friday', 'Vendredi')}
-                    </div>
-                    <div className="text-sm font-semibold">{formatHoursDecimalWithH(total)}</div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Heures ce mois</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{formatHoursDecimalWithH(monthTotal)}</div>
-              <div className="text-sm text-muted-foreground">{format(today, 'MMMM yyyy')}</div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Mes entrées</span>
-            <Badge variant="outline" className="text-xs">
-              {sortedEntries.length} entrée{sortedEntries.length > 1 ? 's' : ''}
-            </Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {entriesForEmployee.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Aucune entrée pour l'employé sélectionné.</p>
-          ) : (
-            <>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Chantier</TableHead>
-                    <TableHead>Categorie</TableHead>
-                    <TableHead className="text-right">Heures</TableHead>
-                    <TableHead className="min-w-[200px]">Description</TableHead>
-                    <TableHead className="w-[100px]">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {paginatedEntries.map((entry) => {
-                  const chantier = chantiers.find((c) => c.id === entry.chantierId);
-                  const category = hourCategories.find((c) => c.id === entry.hourCategoryId);
-                  return (
-                    <TableRow key={entry.id}>
-                      <TableCell>{entry.date}</TableCell>
-                      <TableCell>{chantier?.nom ?? ''}</TableCell>
-                      <TableCell>
-                        {category?.nom ? (
-                          <span className={
-                            category.nom === 'Absent' || category.nom === 'Congé'
-                              ? 'text-amber-600 font-semibold'
-                              : ''
-                          }>
-                            {category.nom}
-                          </span>
-                        ) : (
-                          '-'
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">{formatHoursDecimalWithH(entry.heures)}</TableCell>
-                      <TableCell>{entry.description ?? '-'}</TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => handleEditEntry(entry)}>
-                            <Edit className="h-4 w-4 text-blue-600" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => deleteTimeEntry(entry.id)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-                </TableBody>
-              </Table>
-              
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between mt-4">
-                  <div className="text-sm text-muted-foreground">
-                    Affichage de {startIndex + 1} à {Math.min(startIndex + entriesPerPage, sortedEntries.length)} sur {sortedEntries.length} entrées
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handlePageChange(currentPage - 1)}
-                      disabled={currentPage === 1}
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <span className="text-sm font-medium px-2">
-                      Page {currentPage} sur {totalPages}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handlePageChange(currentPage + 1)}
-                      disabled={currentPage === totalPages}
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </CardContent>
-      </Card>
-      
-      {/* Dialog pour modifier une entrée */}
-      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Modifier une entrée</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
+          <div className="grid gap-4">
             <div className="grid gap-2">
-              <Label>Date</Label>
-              <Input type="date" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} className="text-lg py-3 px-4" />
+              <Label className={isMobile ? 'text-base' : ''}>Date</Label>
+              <Input type="date" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} className={`${isMobile ? 'h-12 text-base' : 'text-lg py-3 px-4'}`} />
             </div>
             
-            <div className="grid grid-cols-2 gap-4">
+            <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
               <div className="grid gap-2">
-                <Label>Heures</Label>
-                <Input type="number" step="1" min="0" max="23" value={entryHeures} onChange={(e) => setEntryHeures(e.target.value)} className="text-lg py-3 px-4" placeholder="8" />
+                <Label className={isMobile ? 'text-base' : ''}>Heures</Label>
+                <Input type="number" step="1" min="0" max="23" value={entryHeures} onChange={(e) => setEntryHeures(e.target.value)} className={`${isMobile ? 'h-12 text-base' : 'text-lg py-3 px-4'}`} placeholder="8" />
               </div>
               <div className="grid gap-2">
-                <Label>Minutes</Label>
-                <div className="flex gap-2">
-                  <Input type="number" step="15" min="0" max="59" value={entryMinutes} onChange={(e) => setEntryMinutes(e.target.value)} className="text-lg py-3 px-4 flex-1" placeholder="0" />
-                  <div className="flex gap-1">
+                <Label className={isMobile ? 'text-base' : ''}>Minutes</Label>
+                <div className={`flex gap-2 ${isMobile ? '' : ''}`}>
+                  <Input type="number" step="15" min="0" max="59" value={entryMinutes} onChange={(e) => setEntryMinutes(e.target.value)} className={`${isMobile ? 'h-12 text-base' : 'text-lg py-3 px-4'} flex-1`} placeholder="0" />
+                  <div className={`flex gap-1 ${isMobile ? 'flex-col' : ''}`}>
                     <Button 
                       type="button" 
                       variant="outline" 
                       size="sm" 
                       onClick={() => setEntryMinutes('15')}
-                      className="px-2 py-1 text-xs"
+                      className={`${isMobile ? 'h-8 px-2 text-xs' : 'px-2 py-1 text-xs'}`}
                     >
                       15min
                     </Button>
@@ -507,7 +280,7 @@ export default function Heures() {
                       variant="outline" 
                       size="sm" 
                       onClick={() => setEntryMinutes('30')}
-                      className="px-2 py-1 text-xs"
+                      className={`${isMobile ? 'h-8 px-2 text-xs' : 'px-2 py-1 text-xs'}`}
                     >
                       30min
                     </Button>
@@ -516,7 +289,7 @@ export default function Heures() {
                       variant="outline" 
                       size="sm" 
                       onClick={() => setEntryMinutes('45')}
-                      className="px-2 py-1 text-xs"
+                      className={`${isMobile ? 'h-8 px-2 text-xs' : 'px-2 py-1 text-xs'}`}
                     >
                       45min
                     </Button>
@@ -526,36 +299,226 @@ export default function Heures() {
             </div>
             
             <div className="grid gap-2">
-              <Label>Catégorie</Label>
+              <Label className={isMobile ? 'text-base' : ''}>Catégorie</Label>
               <select
-                className="input text-lg py-3 px-4"
+                className={`input ${isMobile ? 'h-12 text-base' : 'text-lg py-3 px-4'}`}
                 value={selectedHourCategoryId}
                 onChange={(e) => setSelectedHourCategoryId(e.target.value)}
               >
-                <option value="">Sélectionner</option>
+                <option value="">Sélectionner une catégorie</option>
                 {hourCategories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>{cat.nom}</option>
+                  <option key={cat.id} value={cat.id}>
+                    {cat.nom} ({cat.pourcentage > 0 ? '+' : ''}{cat.pourcentage}%)
+                  </option>
                 ))}
               </select>
             </div>
-            
+
             <div className="grid gap-2">
-              <Label>Chantier</Label>
-              <select
-                className="input text-lg py-3 px-4"
-                value={selectedChantierId}
-                onChange={(e) => setSelectedChantierId(e.target.value)}
-              >
-                <option value="">Sélectionner</option>
-                {chantiers.map((ch) => (
-                  <option key={ch.id} value={ch.id}>{ch.nom}</option>
-                ))}
-              </select>
+              <Label className={isMobile ? 'text-base' : ''}>Description</Label>
+              <Input 
+                type="text" 
+                value={entryDescription} 
+                onChange={(e) => setEntryDescription(e.target.value)} 
+                className={`${isMobile ? 'h-12 text-base' : 'text-lg py-3 px-4'}`} 
+                placeholder="Description du travail effectué..." 
+              />
             </div>
-            
+          </div>
+
+          <div className={`flex gap-3 ${isMobile ? 'flex-col' : ''}`}>
+            <Button 
+              onClick={handleAddEntry} 
+              disabled={!selectedEmployeeId || !entryDate || (!entryHeures || entryHeures === '0')}
+              className={`${isMobile ? 'h-12 text-base' : ''}`}
+            >
+              <Plus className="mr-2 h-4 w-4" />Ajouter l'entrée
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={handleClearForm}
+              className={`${isMobile ? 'h-12 text-base' : ''}`}
+            >
+              Effacer
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Statistiques et liste des entrées */}
+      {currentEmployeeId && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className={isMobile ? 'text-lg' : ''}>Résumé hebdomadaire</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-2 mb-4">
+                <Button variant="outline" size="sm" onClick={() => setCurrentWeekOffset(currentWeekOffset - 1)}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm font-medium">
+                  Semaine du {format(weekStart, 'dd MMM')}
+                </span>
+                <Button variant="outline" size="sm" onClick={() => setCurrentWeekOffset(currentWeekOffset + 1)}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="space-y-2">
+                {weekDays.map((day, index) => (
+                  <div key={index} className="flex justify-between items-center">
+                    <span className="text-sm">{format(day, 'EEEE')}</span>
+                    <span className="font-medium">{formatHoursDecimalWithH(hoursByDay[index].total)}</span>
+                  </div>
+                ))}
+                <div className="border-t pt-2 mt-2">
+                  <div className="flex justify-between items-center font-bold">
+                    <span>Total semaine</span>
+                    <span>{formatHoursDecimalWithH(weekTotal)}</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className={isMobile ? 'text-lg' : ''}>Statistiques du mois</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Total heures ce mois</span>
+                  <span className="font-bold text-lg">{formatHoursDecimalWithH(monthTotal)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Moyenne par jour</span>
+                  <span className="font-medium">
+                    {formatHoursDecimalWithH(monthTotal / 22)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Entrées totales</span>
+                  <span className="font-medium">{entriesForEmployee.length}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Liste des entrées */}
+      <Card>
+        <CardHeader>
+          <CardTitle className={isMobile ? 'text-lg' : ''}>Entrées enregistrées</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {paginatedEntries.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8">
+              Aucune entrée trouvée pour la période sélectionnée.
+            </p>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Employé</TableHead>
+                      <TableHead>Chantier</TableHead>
+                      <TableHead>Catégorie</TableHead>
+                      <TableHead>Heures</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedEntries.map((entry) => {
+                      const emp = employees.find((e) => e.id === entry.employeeId);
+                      const ch = entry.chantierId ? chantiers.find((c) => c.id === entry.chantierId) : null;
+                      const cat = entry.hourCategoryId ? hourCategories.find((c) => c.id === entry.hourCategoryId) : null;
+                      return (
+                        <TableRow key={entry.id}>
+                          <TableCell>{format(parseISO(entry.date), 'dd/MM/yyyy')}</TableCell>
+                          <TableCell>{emp?.prenom} {emp?.nom}</TableCell>
+                          <TableCell>{ch?.nom || 'Bureau'}</TableCell>
+                          <TableCell>
+                            {cat && (
+                              <Badge variant={cat.isBureau ? 'secondary' : 'default'}>
+                                {cat.nom}
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>{formatHoursDecimalWithH(entry.heures)}</TableCell>
+                          <TableCell className="max-w-xs truncate">{entry.description || '-'}</TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              <Button variant="ghost" size="icon" onClick={() => handleEditEntry(entry)}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={() => handleDeleteEntry(entry.id)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex justify-center items-center gap-2 mt-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="text-sm">
+                    Page {currentPage} sur {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Dialog d'édition */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className={isMobile ? 'max-w-sm' : 'sm:max-w-[425px]'}>
+          <DialogHeader>
+            <DialogTitle>Modifier l'entrée</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label>Date</Label>
+              <Input type="date" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} />
+            </div>
+            <div className="grid gap-2">
+              <Label>Heures</Label>
+              <Input type="number" step="1" min="0" max="23" value={entryHeures} onChange={(e) => setEntryHeures(e.target.value)} />
+            </div>
+            <div className="grid gap-2">
+              <Label>Minutes</Label>
+              <Input type="number" step="15" min="0" max="59" value={entryMinutes} onChange={(e) => setEntryMinutes(e.target.value)} />
+            </div>
             <div className="grid gap-2">
               <Label>Description</Label>
-              <Input value={entryDesc} onChange={(e) => setEntryDesc(e.target.value)} placeholder="Ex. Pose de porte" className="text-lg py-3 px-4" />
+              <Input type="text" value={entryDescription} onChange={(e) => setEntryDescription(e.target.value)} />
             </div>
           </div>
           <DialogFooter>
