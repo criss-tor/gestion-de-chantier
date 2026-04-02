@@ -59,7 +59,7 @@ export default function Heures() {
   const [selectedChantierId, setSelectedChantierId] = useState('');
   const [selectedHourCategoryId, setSelectedHourCategoryId] = useState('');
   const [entryDate, setEntryDate] = useState(new Date().toISOString().slice(0, 10));
-  const [entryHeures, setEntryHeures] = useState('8');
+  const [entryHeures, setEntryHeures] = useState('0');
   const [entryMinutes, setEntryMinutes] = useState('0');
   const [entryDescription, setEntryDescription] = useState('');
   const [editingEntry, setEditingEntry] = useState<any>(null);
@@ -180,7 +180,7 @@ export default function Heures() {
 
   const handleClearForm = () => {
     setEntryDate(new Date().toISOString().slice(0, 10));
-    setEntryHeures('8');
+    setEntryHeures('0');
     setEntryMinutes('0');
     setEntryDescription('');
     setSelectedChantierId('');
@@ -259,7 +259,7 @@ export default function Heures() {
             
             <div className="grid gap-2">
               <Label className={isMobile ? 'text-base' : ''}>Heures et minutes</Label>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2 items-center">
                 <Input 
                   type="number" 
                   step="1" 
@@ -267,8 +267,8 @@ export default function Heures() {
                   max="23" 
                   value={entryHeures} 
                   onChange={(e) => setEntryHeures(e.target.value)} 
-                  className={`${isMobile ? 'h-12 w-20 text-base' : 'text-lg py-3 px-4 w-16'}`} 
-                  placeholder="8" 
+                  className={`${isMobile ? 'h-12 w-16 text-base' : 'text-lg py-3 px-4 w-14'}`} 
+                  placeholder="0" 
                 />
                 <span className="flex items-center text-lg font-medium">h</span>
                 <Input 
@@ -278,11 +278,11 @@ export default function Heures() {
                   max="59" 
                   value={entryMinutes} 
                   onChange={(e) => setEntryMinutes(e.target.value)} 
-                  className={`${isMobile ? 'h-12 w-20 text-base' : 'text-lg py-3 px-4 w-16'}`} 
+                  className={`${isMobile ? 'h-12 w-16 text-base' : 'text-lg py-3 px-4 w-14'}`} 
                   placeholder="0" 
                 />
                 <span className="flex items-center text-lg font-medium">min</span>
-                <div className={`flex gap-1 ${isMobile ? 'flex-col' : ''}`}>
+                <div className="flex gap-1">
                   <Button 
                     type="button" 
                     variant="outline" 
@@ -348,14 +348,7 @@ export default function Heures() {
               disabled={!selectedEmployeeId || !entryDate || (!entryHeures || entryHeures === '0')}
               className={`${isMobile ? 'h-12 text-base' : ''}`}
             >
-              <Check className="mr-2 h-4 w-4" />Valider
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={handleClearForm}
-              className={`${isMobile ? 'h-12 text-base' : ''}`}
-            >
-              Effacer
+              <Check className="mr-2 h-4 w-4" />Valider ({entryHeures}h{entryMinutes !== '0' ? entryMinutes : ''})
             </Button>
           </div>
         </CardContent>
@@ -404,18 +397,8 @@ export default function Heures() {
             <CardContent>
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Total heures ce mois</span>
+                  <span className="text-sm text-muted-foreground">Heures du mois</span>
                   <span className="font-bold text-lg">{formatHoursDecimalWithH(monthTotal)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Moyenne par jour</span>
-                  <span className="font-medium">
-                    {formatHoursDecimalWithH(monthTotal / 22)}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Entrées totales</span>
-                  <span className="font-medium">{entriesForEmployee.length}</span>
                 </div>
               </div>
             </CardContent>
