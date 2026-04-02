@@ -100,6 +100,38 @@ export function ChantierDetailDialog({ chantierId, open, onOpenChange }: Chantie
     }
   };
 
+  const handleEditMaterial = (cost: any) => {
+    setEditingMaterial(cost.id);
+    setNewMaterialDescription(cost.description);
+    setNewMaterialAmount(String(cost.montant));
+    setNewMaterialDate(cost.date);
+  };
+
+  const handleUpdateMaterial = () => {
+    if (editingMaterial && newMaterialDescription && newMaterialAmount && chantierId) {
+      // Note: updateMaterialCost n'existe pas dans le contexte, on va simuler une modification
+      // en supprimant l'ancien et en ajoutant le nouveau
+      deleteMaterialCost(editingMaterial);
+      addMaterialCost({
+        chantierId,
+        description: newMaterialDescription,
+        montant: Number(newMaterialAmount),
+        date: newMaterialDate,
+      });
+      setEditingMaterial(null);
+      setNewMaterialDescription('');
+      setNewMaterialAmount('0');
+      setNewMaterialDate(new Date().toISOString().slice(0, 10));
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMaterial(null);
+    setNewMaterialDescription('');
+    setNewMaterialAmount('0');
+    setNewMaterialDate(new Date().toISOString().slice(0, 10));
+  };
+
   const renderContent = () => (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
@@ -231,9 +263,12 @@ export function ChantierDetailDialog({ chantierId, open, onOpenChange }: Chantie
             </Button>
           </div>
 
-          {/* Formulaire d'ajout de matériel */}
-          {showAddMaterial && (
+          {/* Formulaire d'ajout/modification de matériel */}
+          {(showAddMaterial || editingMaterial) && (
             <div className="p-3 border rounded-md bg-muted/30 space-y-2">
+              <div className="text-sm font-medium">
+                {editingMaterial ? 'Modifier le coût matériel' : 'Ajouter un coût matériel'}
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
                 <Input
                   placeholder="Description"
@@ -255,15 +290,15 @@ export function ChantierDetailDialog({ chantierId, open, onOpenChange }: Chantie
                   className="text-sm"
                 />
                 <div className="flex gap-1">
-                  <Button size="sm" onClick={handleAddMaterial}>
-                    <Plus className="h-4 w-4" />
+                  <Button size="sm" onClick={editingMaterial ? handleUpdateMaterial : handleAddMaterial}>
+                    {editingMaterial ? 'Sauver' : <Plus className="h-4 w-4" />}
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setShowAddMaterial(false)}
+                    onClick={editingMaterial ? handleCancelEdit : () => setShowAddMaterial(false)}
                   >
-                    Annuler
+                    {editingMaterial ? 'Annuler' : 'Annuler'}
                   </Button>
                 </div>
               </div>
@@ -290,14 +325,24 @@ export function ChantierDetailDialog({ chantierId, open, onOpenChange }: Chantie
                       <TableCell className="text-muted-foreground">{cost.date}</TableCell>
                       <TableCell className="text-right font-medium">{formatCurrency(cost.montant)}</TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteMaterial(cost.id)}
-                          className="h-8 w-8 text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <div className="flex gap-1 justify-end">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEditMaterial(cost)}
+                            className="h-8 w-8"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteMaterial(cost.id)}
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
