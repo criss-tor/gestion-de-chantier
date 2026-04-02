@@ -15,7 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 interface AddChantierDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave: (chantier: Omit<Chantier, 'id'>) => void;
+  onSave: (chantier: Omit<Chantier, 'id'> & { id?: string }) => void;
 }
 
 export function AddChantierDialog({
@@ -27,11 +27,13 @@ export function AddChantierDialog({
   const [description, setDescription] = useState('');
   const [devis, setDevis] = useState('0');
   const [heuresPrevues, setHeuresPrevues] = useState('0');
+  const [customId, setCustomId] = useState('');
 
   const handleSave = () => {
     if (!nom.trim()) return;
     
     onSave({
+      id: customId.trim() || undefined, // Si l'ID est fourni, l'utiliser, sinon undefined pour génération auto
       nom: nom.trim(),
       description: description.trim() || undefined,
       devis: Number(devis) || 0,
@@ -47,6 +49,7 @@ export function AddChantierDialog({
     setDescription('');
     setDevis('0');
     setHeuresPrevues('0');
+    setCustomId('');
   };
 
   return (
@@ -57,6 +60,19 @@ export function AddChantierDialog({
         </DialogHeader>
         
         <div className="grid gap-4 py-4">
+          <div className="grid gap-2">
+            <Label htmlFor="customId">ID personnalisé (optionnel)</Label>
+            <Input
+              id="customId"
+              value={customId}
+              onChange={(e) => setCustomId(e.target.value)}
+              placeholder="Laissez vide pour génération automatique"
+            />
+            <p className="text-xs text-muted-foreground">
+              Si vous ne spécifiez pas d'ID, il sera généré automatiquement
+            </p>
+          </div>
+          
           <div className="grid gap-2">
             <Label htmlFor="nom">Nom du chantier</Label>
             <Input

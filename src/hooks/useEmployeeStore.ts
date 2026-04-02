@@ -121,9 +121,10 @@ export function useEmployeeStore() {
     await supabase.from('time_entries').delete().eq('id', id);
   }, []);
 
-  const addChantier = useCallback(async (chantier: Omit<Chantier, 'id'>) => {
-    const id = `ch${Date.now()}`;
-    const newCh: Chantier = { ...chantier, id };
+  const addChantier = useCallback(async (chantier: Omit<Chantier, 'id'> & { id?: string }) => {
+    const id = chantier.id || `ch${Date.now()}`;
+    const { id: _id, ...chantierData } = chantier; // Extraire l'ID s'il existe
+    const newCh: Chantier = { ...chantierData, id };
     setChantiers(prev => [...prev, newCh]);
     await supabase.from('chantiers').insert({
       id,
