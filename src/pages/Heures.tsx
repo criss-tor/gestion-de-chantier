@@ -28,9 +28,12 @@ import { fr } from 'date-fns/locale/fr';
 import { useOfflineSync } from '@/hooks/useOfflineSync';
 import { OfflineIndicator } from '@/components/OfflineIndicator';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useSearchParams } from 'react-router-dom';
 
 export default function Heures() {
   const isMobile = useIsMobile();
+  const [searchParams] = useSearchParams();
+  const preselectedEmployeeId = searchParams.get('employee');
   
   const {
     employees,
@@ -55,7 +58,7 @@ export default function Heures() {
   } = useOfflineSync();
 
   // États pour le formulaire
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState(currentEmployeeId || '');
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState(preselectedEmployeeId || currentEmployeeId || '');
   const [selectedChantierId, setSelectedChantierId] = useState('');
   const [selectedHourCategoryId, setSelectedHourCategoryId] = useState('');
   const [entryDate, setEntryDate] = useState(new Date().toISOString().slice(0, 10));
@@ -324,7 +327,7 @@ export default function Heures() {
                 <option value="">Sélectionner une catégorie</option>
                 {hourCategories.map((cat) => (
                   <option key={cat.id} value={cat.id}>
-                    {cat.nom} ({cat.pourcentage > 0 ? '+' : ''}{cat.pourcentage}%)
+                    {cat.nom}
                   </option>
                 ))}
               </select>

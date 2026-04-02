@@ -125,6 +125,10 @@ export default function Employees() {
           setShowAddEmployee(true);
         }}
         onDelete={deleteEmployee}
+        onAddTime={(employee) => {
+          // Rediriger vers la page Heures avec l'employé pré-sélectionné
+          window.location.href = `/heures?employee=${employee.id}`;
+        }}
       />
 
       <AddEmployeeDialog

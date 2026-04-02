@@ -18,7 +18,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Clock, Package, Users } from 'lucide-react';
+import { Clock, Package, Users, Trash2, Edit, Plus } from 'lucide-react';
 
 interface ChantierDetailDialogProps {
   chantierId: string | null;
@@ -27,11 +27,16 @@ interface ChantierDetailDialogProps {
 }
 
 export function ChantierDetailDialog({ chantierId, open, onOpenChange }: ChantierDetailDialogProps) {
-  const { employees, timeEntries, materialCosts, getChantierById, getEntryCost, chantierStats, updateChantier } = useEmployeeContext();
+  const { employees, timeEntries, materialCosts, getChantierById, getEntryCost, chantierStats, updateChantier, deleteMaterialCost, addMaterialCost } = useEmployeeContext();
 
   const [devisInput, setDevisInput] = useState('0');
   const [heuresPrevuesInput, setHeuresPrevuesInput] = useState('0');
   const [editMode, setEditMode] = useState(false);
+  const [editingMaterial, setEditingMaterial] = useState<string | null>(null);
+  const [newMaterialDescription, setNewMaterialDescription] = useState('');
+  const [newMaterialAmount, setNewMaterialAmount] = useState('0');
+  const [newMaterialDate, setNewMaterialDate] = useState(new Date().toISOString().slice(0, 10));
+  const [showAddMaterial, setShowAddMaterial] = useState(false);
 
   const chantier = chantierId ? getChantierById(chantierId) : undefined;
 
@@ -74,9 +79,30 @@ export function ChantierDetailDialog({ chantierId, open, onOpenChange }: Chantie
   const totalCost = totalMain + totalMateriel + (stat?.coutBureau || 0);
   const margin = (chantier.devis ?? 0) - totalCost;
 
+  const handleAddMaterial = () => {
+    if (newMaterialDescription && newMaterialAmount && chantierId) {
+      addMaterialCost({
+        chantierId,
+        description: newMaterialDescription,
+        montant: Number(newMaterialAmount),
+        date: newMaterialDate,
+      });
+      setNewMaterialDescription('');
+      setNewMaterialAmount('0');
+      setNewMaterialDate(new Date().toISOString().slice(0, 10));
+      setShowAddMaterial(false);
+    }
+  };
+
+  const handleDeleteMaterial = (materialId: string) => {
+    if (confirm('Êtes-vous sûr de vouloir supprimer ce coût matériel ?')) {
+      deleteMaterialCost(materialId);
+    }
+  };
+
   const renderContent = () => (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl">{chantier.nom}</DialogTitle>
           {chantier.description && (
@@ -189,32 +215,95 @@ export function ChantierDetailDialog({ chantierId, open, onOpenChange }: Chantie
 
         {/* Material costs */}
         <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <Package className="h-4 w-4 text-muted-foreground" />
-            <h3 className="font-semibold text-sm">Matériel</h3>
-            <Badge variant="secondary" className="ml-auto">{formatCurrency(totalMateriel)}</Badge>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Package className="h-4 w-4 text-muted-foreground" />
+              <h3 className="font-semibold text-sm">Coûts matériels</h3>
+              <Badge variant="secondary">{chantierMaterials.length} coûts</Badge>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAddMaterial(!showAddMaterial)}
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Ajouter un coût
+            </Button>
           </div>
+
+          {/* Formulaire d'ajout de matériel */}
+          {showAddMaterial && (
+            <div className="p-3 border rounded-md bg-muted/30 space-y-2">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                <Input
+                  placeholder="Description"
+                  value={newMaterialDescription}
+                  onChange={(e) => setNewMaterialDescription(e.target.value)}
+                  className="text-sm"
+                />
+                <Input
+                  type="number"
+                  placeholder="Montant"
+                  value={newMaterialAmount}
+                  onChange={(e) => setNewMaterialAmount(e.target.value)}
+                  className="text-sm"
+                />
+                <Input
+                  type="date"
+                  value={newMaterialDate}
+                  onChange={(e) => setNewMaterialDate(e.target.value)}
+                  className="text-sm"
+                />
+                <div className="flex gap-1">
+                  <Button size="sm" onClick={handleAddMaterial}>
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowAddMaterial(false)}
+                  >
+                    Annuler
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {chantierMaterials.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-2">Aucun frais de matériel</p>
+            <p className="text-sm text-muted-foreground py-2">Aucun coût matériel enregistré</p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead className="text-right">Montant</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {chantierMaterials.map((cost) => (
-                  <TableRow key={cost.id}>
-                    <TableCell>{cost.description}</TableCell>
-                    <TableCell className="text-muted-foreground">{cost.date}</TableCell>
-                    <TableCell className="text-right font-medium">{formatCurrency(cost.montant)}</TableCell>
+            <div className="space-y-2 max-h-[300px] overflow-y-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead className="text-right">Montant</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {chantierMaterials.map((cost) => (
+                    <TableRow key={cost.id}>
+                      <TableCell>{cost.description}</TableCell>
+                      <TableCell className="text-muted-foreground">{cost.date}</TableCell>
+                      <TableCell className="text-right font-medium">{formatCurrency(cost.montant)}</TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteMaterial(cost.id)}
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </div>
 
