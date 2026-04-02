@@ -44,18 +44,18 @@ export function EmployeeTable({
   // Vue Mobile: Cartes optimisées
   if (showMobileView) {
     return (
-      <div className="space-y-3">
+      <div className="space-y-3 max-w-sm mx-auto">
         {employees.map((employee) => {
           const totalHours = getTotalHours(employee.id);
           const totalCost = getTotalCost(employee.id);
           
           return (
             <Card key={employee.id} className="overflow-hidden">
-              <CardContent className="p-4">
+              <CardContent className="p-3">
                 {/* En-tête avec nom et rôle */}
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between mb-3">
                   <div className="flex-1">
-                    <h3 className="text-lg font-bold text-foreground">
+                    <h3 className="text-base font-bold text-foreground">
                       {employee.prenom} {employee.nom}
                     </h3>
                     <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium mt-1 ${
@@ -69,51 +69,51 @@ export function EmployeeTable({
                 </div>
 
                 {/* Informations principales */}
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div className="bg-muted/30 rounded-lg p-3">
-                    <div className="text-sm text-muted-foreground mb-1">Coût/h</div>
-                    <div className="text-xl font-bold text-foreground">{formatCurrency(employee.coutHoraire)}</div>
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  <div className="bg-muted/30 rounded-lg p-2">
+                    <div className="text-xs text-muted-foreground mb-1">Coût/h</div>
+                    <div className="text-lg font-bold text-foreground">{formatCurrency(employee.coutHoraire)}</div>
                   </div>
-                  <div className="bg-muted/30 rounded-lg p-3">
-                    <div className="text-sm text-muted-foreground mb-1">Heures{monthLabel ? ` (${monthLabel})` : ''}</div>
-                    <div className="text-xl font-bold text-foreground">{formatHoursDecimalWithH(totalHours)}</div>
+                  <div className="bg-muted/30 rounded-lg p-2">
+                    <div className="text-xs text-muted-foreground mb-1">Heures{monthLabel ? ` (${monthLabel})` : ''}</div>
+                    <div className="text-lg font-bold text-foreground">{formatHoursDecimalWithH(totalHours)}</div>
                   </div>
                 </div>
 
                 {/* Coût total et actions */}
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
-                    <div className="text-sm text-muted-foreground mb-1">Coût{monthLabel ? ` (${monthLabel})` : ''}</div>
-                    <div className="text-xl font-bold text-primary">{formatCurrency(totalCost)}</div>
+                    <div className="text-xs text-muted-foreground mb-1">Coût{monthLabel ? ` (${monthLabel})` : ''}</div>
+                    <div className="text-lg font-bold text-primary">{formatCurrency(totalCost)}</div>
                   </div>
                   
-                  {/* Boutons d'action - plus grands et plus visibles */}
-                  <div className="flex gap-2 ml-4">
+                  {/* Boutons d'action - plus petits mais encore cliquables */}
+                  <div className="flex gap-1 ml-2">
                     <Button 
-                      size="lg" 
+                      size="sm" 
                       onClick={() => onAddTime(employee)} 
-                      className="h-12 w-12 p-0 bg-green-600 hover:bg-green-700 text-white"
+                      className="h-10 w-10 p-0 bg-green-600 hover:bg-green-700 text-white"
                       title="Ajouter des heures"
                     >
-                      <Clock className="h-5 w-5" />
+                      <Clock className="h-4 w-4" />
                     </Button>
                     <Button 
-                      size="lg" 
+                      size="sm" 
                       onClick={() => onEdit(employee)} 
                       variant="outline"
-                      className="h-12 w-12 p-0 border-2"
+                      className="h-10 w-10 p-0 border-2"
                       title="Modifier"
                     >
-                      <Pencil className="h-5 w-5" />
+                      <Pencil className="h-4 w-4" />
                     </Button>
                     <Button 
-                      size="lg" 
+                      size="sm" 
                       onClick={() => onDelete(employee.id)} 
                       variant="destructive"
-                      className="h-12 w-12 p-0"
+                      className="h-10 w-10 p-0"
                       title="Supprimer"
                     >
-                      <Trash2 className="h-5 w-5" />
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
