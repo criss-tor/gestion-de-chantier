@@ -8,13 +8,9 @@ export function useEmployeeStore() {
     const stored = window.localStorage.getItem('gc_currentEmployeeId');
     return stored || null;
   });
-  const [hasConnected, setHasConnected] = useState<boolean>(() => {
+  const [hasConnected, setHasConnected] = useState(() => {
     const stored = window.localStorage.getItem('gc_hasConnected');
     return stored === 'true';
-  });
-  const [loginHistory, setLoginHistory] = useState<Array<{timestamp: string, employeeId: string, employeeName: string, role: string}>>(() => {
-    const stored = window.localStorage.getItem('gc_loginHistory');
-    return stored ? JSON.parse(stored) : [];
   });
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
   const [chantiers, setChantiers] = useState<Chantier[]>([]);
@@ -37,19 +33,6 @@ export function useEmployeeStore() {
       const fetchedCategories = (catRes.data || []).map(c => ({ id: c.id, nom: c.nom, pourcentage: Number(c.pourcentage), isBureau: c.is_bureau }));
       setHourCategories(fetchedCategories);
 
-      // Ensure standard categories exist (absent/congé) for employees
-      const ensureDefault = async () => {
-        const defaults = [
-          { nom: 'Absent', pourcentage: 0, isBureau: false },
-          { nom: 'Congé', pourcentage: 0, isBureau: false },
-        ];
-        for (const def of defaults) {
-          if (!fetchedCategories.some((c) => c.nom === def.nom)) {
-            await addHourCategory(def);
-          }
-        }
-      };
-      ensureDefault();
       setChantiers((chRes.data || []).map(c => ({
         id: c.id,
         nom: c.nom,
@@ -77,25 +60,10 @@ export function useEmployeeStore() {
     window.localStorage.setItem('gc_hasConnected', 'true');
     if (id) {
       window.localStorage.setItem('gc_currentEmployeeId', id);
-      // Enregistrer dans l'historique
-      const employee = employees.find(e => e.id === id);
-      if (employee) {
-        const newEntry = {
-          timestamp: new Date().toISOString(),
-          employeeId: id,
-          employeeName: `${employee.prenom} ${employee.nom}`,
-          role: employee.role
-        };
-        setLoginHistory(prev => {
-          const updated = [newEntry, ...prev.slice(0, 9)]; // Garder les 10 dernières connexions
-          window.localStorage.setItem('gc_loginHistory', JSON.stringify(updated));
-          return updated;
-        });
-      }
     } else {
       window.localStorage.removeItem('gc_currentEmployeeId');
     }
-  }, [employees]);
+  }, []);
 
   const logout = useCallback(() => {
     setCurrentEmployeeId(null);
@@ -356,15 +324,15 @@ export function useEmployeeStore() {
 
   return {
     employees,
-    setEmployees,
     currentEmployeeId,
-    setCurrentEmployeeId,
+    setCurrentEmployee,
     hasConnected,
+    logout,
+    employeesLoading: loading,
     timeEntries,
     chantiers,
     materialCosts,
     hourCategories,
-    loading,
     addEmployee,
     updateEmployee,
     deleteEmployee,
@@ -376,6 +344,7 @@ export function useEmployeeStore() {
     updateChantier,
     addMaterialCost,
     deleteMaterialCost,
+    setMaterialCosts,
     addHourCategory,
     updateHourCategory,
     deleteHourCategory,
@@ -383,14 +352,10 @@ export function useEmployeeStore() {
     getChantierById,
     getHourCategoryById,
     getEntryCost,
-    getTimeEntriesForEmployee,
+    stats,
     getTotalHoursForEmployee,
     getTotalCostForEmployee,
     restoreData,
     chantierStats,
-    stats,
-    setCurrentEmployee,
-    logout,
-    loginHistory,
   };
 }

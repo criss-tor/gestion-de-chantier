@@ -46,8 +46,7 @@ const Dashboard = () => {
     getEmployeeById,
     getChantierById,
     getHourCategoryById,
-    getEntryCost,
-    loginHistory
+    getEntryCost
   } = useEmployeeContext();
 
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -511,41 +510,6 @@ const Dashboard = () => {
 
         })}
       </div>
-
-      {/* Login History */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Historique des connexions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loginHistory.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Aucune connexion enregistrée.</p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date/Heure</TableHead>
-                  <TableHead>Utilisateur</TableHead>
-                  <TableHead>Rôle</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loginHistory.map((entry, index) => (
-                  <TableRow key={index}>
-                    <TableCell>{format(new Date(entry.timestamp), 'dd/MM/yyyy HH:mm', { locale: fr })}</TableCell>
-                    <TableCell>{entry.employeeName}</TableCell>
-                    <TableCell>
-                      <Badge variant={entry.role === 'admin' ? 'default' : 'secondary'}>
-                        {entry.role === 'admin' ? 'Administrateur' : 'Employé'}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
 
       {/* Add Entry Dialog */}
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>

@@ -22,13 +22,9 @@ export function useSecureEmployeeStore() {
     const stored = localStorage.getItem(getSessionKey('gc_currentEmployeeId'));
     return stored || null;
   });
-  const [hasConnected, setHasConnected] = useState<boolean>(() => {
+  const [hasConnected, setHasConnected] = useState(() => {
     const stored = localStorage.getItem(getSessionKey('gc_hasConnected'));
     return stored === 'true';
-  });
-  const [loginHistory, setLoginHistory] = useState<Array<{timestamp: string, employeeId: string, employeeName: string, role: string}>>(() => {
-    const stored = localStorage.getItem(getSessionKey('gc_loginHistory'));
-    return stored ? JSON.parse(stored) : [];
   });
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
   const [chantiers, setChantiers] = useState<Chantier[]>([]);
@@ -65,19 +61,6 @@ export function useSecureEmployeeStore() {
       const fetchedCategories = (catRes.data || []).map(c => ({ id: c.id, nom: c.nom, pourcentage: Number(c.pourcentage), isBureau: c.is_bureau }));
       setHourCategories(fetchedCategories);
 
-      // Ensure standard categories exist (absent/congé) for employees
-      const ensureDefault = async () => {
-        const defaults = [
-          { nom: 'Absent', pourcentage: 0, isBureau: false },
-          { nom: 'Congé', pourcentage: 0, isBureau: false },
-        ];
-        for (const def of defaults) {
-          if (!fetchedCategories.some((c) => c.nom === def.nom)) {
-            await addHourCategory(def);
-          }
-        }
-      };
-      ensureDefault();
       setChantiers((chRes.data || []).map(c => ({
         id: c.id,
         nom: c.nom,
@@ -105,21 +88,6 @@ export function useSecureEmployeeStore() {
     localStorage.setItem(getSessionKey('gc_hasConnected'), 'true');
     if (id) {
       localStorage.setItem(getSessionKey('gc_currentEmployeeId'), id);
-      // Enregistrer dans l'historique
-      const employee = employees.find(e => e.id === id);
-      if (employee) {
-        const newEntry = {
-          timestamp: new Date().toISOString(),
-          employeeId: id,
-          employeeName: `${employee.prenom} ${employee.nom}`,
-          role: employee.role
-        };
-        setLoginHistory(prev => {
-          const updated = [newEntry, ...prev.slice(0, 9)]; // Garder les 10 dernières connexions
-          localStorage.setItem(getSessionKey('gc_loginHistory'), JSON.stringify(updated));
-          return updated;
-        });
-      }
     } else {
       localStorage.removeItem(getSessionKey('gc_currentEmployeeId'));
     }
@@ -174,6 +142,5 @@ export function useSecureEmployeeStore() {
     stats,
     setCurrentEmployee,
     logout,
-    loginHistory,
   };
 }
