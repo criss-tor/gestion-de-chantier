@@ -21,9 +21,10 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, Clock, ChevronLeft, ChevronRight, Edit } from 'lucide-react';
+import { Plus, Trash2, Clock, ChevronLeft, ChevronRight, Edit, Check } from 'lucide-react';
 import { formatHoursDecimalWithH } from '@/lib/utils';
 import { startOfWeek, addDays, format, isSameMonth, parseISO, subWeeks, addWeeks } from 'date-fns';
+import { fr } from 'date-fns/locale/fr';
 import { useOfflineSync } from '@/hooks/useOfflineSync';
 import { OfflineIndicator } from '@/components/OfflineIndicator';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -256,44 +257,59 @@ export default function Heures() {
               <Input type="date" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} className={`${isMobile ? 'h-12 text-base' : 'text-lg py-3 px-4'}`} />
             </div>
             
-            <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
-              <div className="grid gap-2">
-                <Label className={isMobile ? 'text-base' : ''}>Heures</Label>
-                <Input type="number" step="1" min="0" max="23" value={entryHeures} onChange={(e) => setEntryHeures(e.target.value)} className={`${isMobile ? 'h-12 text-base' : 'text-lg py-3 px-4'}`} placeholder="8" />
-              </div>
-              <div className="grid gap-2">
-                <Label className={isMobile ? 'text-base' : ''}>Minutes</Label>
-                <div className={`flex gap-2 ${isMobile ? '' : ''}`}>
-                  <Input type="number" step="15" min="0" max="59" value={entryMinutes} onChange={(e) => setEntryMinutes(e.target.value)} className={`${isMobile ? 'h-12 text-base' : 'text-lg py-3 px-4'} flex-1`} placeholder="0" />
-                  <div className={`flex gap-1 ${isMobile ? 'flex-col' : ''}`}>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => setEntryMinutes('15')}
-                      className={`${isMobile ? 'h-8 px-2 text-xs' : 'px-2 py-1 text-xs'}`}
-                    >
-                      15min
-                    </Button>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => setEntryMinutes('30')}
-                      className={`${isMobile ? 'h-8 px-2 text-xs' : 'px-2 py-1 text-xs'}`}
-                    >
-                      30min
-                    </Button>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => setEntryMinutes('45')}
-                      className={`${isMobile ? 'h-8 px-2 text-xs' : 'px-2 py-1 text-xs'}`}
-                    >
-                      45min
-                    </Button>
-                  </div>
+            <div className="grid gap-2">
+              <Label className={isMobile ? 'text-base' : ''}>Heures et minutes</Label>
+              <div className="flex gap-2">
+                <Input 
+                  type="number" 
+                  step="1" 
+                  min="0" 
+                  max="23" 
+                  value={entryHeures} 
+                  onChange={(e) => setEntryHeures(e.target.value)} 
+                  className={`${isMobile ? 'h-12 w-20 text-base' : 'text-lg py-3 px-4 w-16'}`} 
+                  placeholder="8" 
+                />
+                <span className="flex items-center text-lg font-medium">h</span>
+                <Input 
+                  type="number" 
+                  step="15" 
+                  min="0" 
+                  max="59" 
+                  value={entryMinutes} 
+                  onChange={(e) => setEntryMinutes(e.target.value)} 
+                  className={`${isMobile ? 'h-12 w-20 text-base' : 'text-lg py-3 px-4 w-16'}`} 
+                  placeholder="0" 
+                />
+                <span className="flex items-center text-lg font-medium">min</span>
+                <div className={`flex gap-1 ${isMobile ? 'flex-col' : ''}`}>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setEntryMinutes('15')}
+                    className={`${isMobile ? 'h-8 px-2 text-xs' : 'px-2 py-1 text-xs'}`}
+                  >
+                    15
+                  </Button>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setEntryMinutes('30')}
+                    className={`${isMobile ? 'h-8 px-2 text-xs' : 'px-2 py-1 text-xs'}`}
+                  >
+                    30
+                  </Button>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setEntryMinutes('45')}
+                    className={`${isMobile ? 'h-8 px-2 text-xs' : 'px-2 py-1 text-xs'}`}
+                  >
+                    45
+                  </Button>
                 </div>
               </div>
             </div>
@@ -332,7 +348,7 @@ export default function Heures() {
               disabled={!selectedEmployeeId || !entryDate || (!entryHeures || entryHeures === '0')}
               className={`${isMobile ? 'h-12 text-base' : ''}`}
             >
-              <Plus className="mr-2 h-4 w-4" />Ajouter l'entrée
+              <Check className="mr-2 h-4 w-4" />Valider
             </Button>
             <Button 
               variant="outline" 
@@ -367,7 +383,7 @@ export default function Heures() {
               <div className="space-y-2">
                 {weekDays.map((day, index) => (
                   <div key={index} className="flex justify-between items-center">
-                    <span className="text-sm">{format(day, 'EEEE')}</span>
+                    <span className="text-sm">{format(day, 'EEEE', { locale: fr })}</span>
                     <span className="font-medium">{formatHoursDecimalWithH(hoursByDay[index].total)}</span>
                   </div>
                 ))}
