@@ -39,6 +39,7 @@ export default function Chantiers() {
   const [showAddMaterial, setShowAddMaterial] = useState(false);
   const [deletingChantier, setDeletingChantier] = useState<string | null>(null);
   const [selectedChantier, setSelectedChantier] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('fr-CH', {
@@ -51,8 +52,15 @@ export default function Chantiers() {
 
   const handleDeleteChantier = () => {
     if (deletingChantier) {
-      deleteChantier(deletingChantier);
-      setDeletingChantier(null);
+      if (!confirmDelete) {
+        // Première confirmation
+        setConfirmDelete(true);
+      } else {
+        // Seconde confirmation - suppression effective
+        deleteChantier(deletingChantier);
+        setDeletingChantier(null);
+        setConfirmDelete(false);
+      }
     }
   };
 
@@ -213,18 +221,44 @@ export default function Chantiers() {
         chantiers={chantiers}
       />
 
-      <AlertDialog open={!!deletingChantier} onOpenChange={() => setDeletingChantier(null)}>
+      <AlertDialog open={!!deletingChantier} onOpenChange={() => { setDeletingChantier(null); setConfirmDelete(false); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer ce chantier ?</AlertDialogTitle>
+            <AlertDialogTitle className={confirmDelete ? "text-destructive" : ""}>
+              {confirmDelete ? "DERNIÈRE CONFIRMATION" : "Supprimer ce chantier ?"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Cette action supprimera également toutes les heures et frais associés à ce chantier.
+              {confirmDelete ? (
+                <div className="space-y-2">
+                  <p className="font-semibold text-destructive">
+                    ATTENTION : Vous allez supprimer TOUTES les données du chantier !
+                  </p>
+                  <p>Cette action est <strong>irréversible</strong> et supprimera :</p>
+                  <ul className="list-disc list-inside space-y-1 text-sm">
+                    <li>Le chantier et toutes ses informations</li>
+                    <li>Toutes les heures enregistrées par les employés</li>
+                    <li>Tous les coûts matériels associés</li>
+                    <li>Toutes les statistiques et bilans</li>
+                  </ul>
+                  <p className="font-medium">Êtes-vous absolument certain de continuer ?</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p>Cette action supprimera également toutes les heures et frais associés à ce chantier.</p>
+                  <p>Cliquez sur "Supprimer" pour voir la confirmation finale.</p>
+                </div>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteChantier}>
-              Supprimer
+            <AlertDialogCancel onClick={() => { setDeletingChantier(null); setConfirmDelete(false); }}>
+              {confirmDelete ? "NON, ANNULER" : "Annuler"}
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteChantier}
+              className={confirmDelete ? "bg-destructive hover:bg-destructive/90" : ""}
+            >
+              {confirmDelete ? "OUI, SUPPRIMER TOUT" : "Supprimer"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

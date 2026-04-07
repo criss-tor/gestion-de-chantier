@@ -92,8 +92,7 @@ export function PDFExportDialog({
               chantier,
               timeEntries,
               employees,
-              hourCategories,
-              selectedMonth
+              hourCategories
             );
           }
           break;
@@ -122,7 +121,7 @@ export function PDFExportDialog({
       case 'employee':
         return 'Génère un rapport détaillé des heures pour un employé spécifique';
       case 'chantier':
-        return 'Génère un bilan des heures et coûts par chantier';
+        return 'Génère un bilan complet du chantier avec résumé par catégories';
       case 'global':
         return 'Génère un résumé global de tous les employés et chantiers';
     }

@@ -112,13 +112,12 @@ export class PDFExportService {
     pdf.save(fileName);
   }
 
-  // Export PDF du bilan par chantier (un seul chantier sélectionné)
+  // Export PDF du bilan par chantier (tout le chantier, pas seulement un mois)
   async exportChantierReport(
     chantier: Chantier,
     entries: TimeEntry[],
     employees: Employee[],
-    categories: HourCategory[],
-    month: string
+    categories: HourCategory[]
   ): Promise<void> {
     const pdf = new jsPDF();
     const pageWidth = pdf.internal.pageSize.getWidth();
@@ -126,14 +125,23 @@ export class PDFExportService {
     // En-tête
     pdf.setFontSize(20);
     pdf.setFont('helvetica', 'bold');
-    pdf.text(`Bilan Chantier: ${chantier.nom}`, pageWidth / 2, 30, { align: 'center' });
+    pdf.text(`Bilan Complet Chantier: ${chantier.nom}`, pageWidth / 2, 30, { align: 'center' });
     
+    // Informations du chantier
     pdf.setFontSize(14);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(`Mois: ${this.formatMonth(month)}`, 20, 50);
+    pdf.text(`ID: ${chantier.id}`, 20, 50);
+    if (chantier.description) {
+      pdf.text(`Description: ${chantier.description}`, 20, 60);
+      pdf.text(`Devis: ${chantier.devis ? chantier.devis.toFixed(2) + ' CHF' : 'Non défini'}`, 20, 70);
+      pdf.text(`Heures prévues: ${chantier.heuresPrevues ? chantier.heuresPrevues.toFixed(2) + ' h' : 'Non défini'}`, 20, 80);
+    } else {
+      pdf.text(`Devis: ${chantier.devis ? chantier.devis.toFixed(2) + ' CHF' : 'Non défini'}`, 20, 60);
+      pdf.text(`Heures prévues: ${chantier.heuresPrevues ? chantier.heuresPrevues.toFixed(2) + ' h' : 'Non défini'}`, 20, 70);
+    }
     
-    // Statistiques du chantier
-    const chantierEntries = entries.filter(e => e.chantierId === chantier.id && e.date.startsWith(month));
+    // Statistiques du chantier (toutes les entrées)
+    const chantierEntries = entries.filter(e => e.chantierId === chantier.id);
     const totalHours = chantierEntries.reduce((sum, e) => sum + e.heures, 0);
     
     // Calculer le coût total
@@ -143,25 +151,80 @@ export class PDFExportService {
       totalCost += entry.heures * (employee?.coutHoraire || 0);
     });
     
+    // Résumé par catégories
+    const hoursByCategory = new Map<string, { hours: number; cost: number; name: string }>();
+    
+    chantierEntries.forEach(entry => {
+      const employee = employees.find(emp => emp.id === entry.employeeId);
+      const category = categories.find(c => c.id === entry.hourCategoryId);
+      const categoryName = category ? category.nom : 'Standard';
+      const entryCost = entry.heures * (employee?.coutHoraire || 0);
+      
+      const existing = hoursByCategory.get(categoryName) || { hours: 0, cost: 0, name: categoryName };
+      existing.hours += entry.heures;
+      existing.cost += entryCost;
+      hoursByCategory.set(categoryName, existing);
+    });
+    
+    // Afficher le résumé général
     pdf.setFontSize(12);
     pdf.setFont('helvetica', 'bold');
-    pdf.text('Résumé:', 20, 70);
+    pdf.text('Résumé général:', 20, 100);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(`Heures totales: ${totalHours.toFixed(2)} h`, 20, 80);
-    pdf.text(`Coût total: ${totalCost.toFixed(2)} CHF`, 20, 88);
-    pdf.text(`Nombre d'entrées: ${chantierEntries.length}`, 20, 96);
+    pdf.text(`Heures totales: ${totalHours.toFixed(2)} h`, 20, 110);
+    pdf.text(`Coût total: ${totalCost.toFixed(2)} CHF`, 20, 118);
+    pdf.text(`Nombre d'entrées: ${chantierEntries.length}`, 20, 126);
+    
+    // Afficher le résumé par catégories
+    pdf.setFontSize(12);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Résumé par catégories:', 20, 140);
+    pdf.setFont('helvetica', 'normal');
+    
+    let categoryYPosition = 150;
+    pdf.setFontSize(10);
+    
+    if (hoursByCategory.size === 0) {
+      pdf.text('Aucune entrée trouvée', 20, categoryYPosition);
+    } else {
+      // En-tête du tableau
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Catégorie', 20, categoryYPosition);
+      pdf.text('Heures', 80, categoryYPosition);
+      pdf.text('Coût', 120, categoryYPosition);
+      pdf.text('%', 160, categoryYPosition);
+      categoryYPosition += 6;
+      
+      // Données du tableau
+      pdf.setFont('helvetica', 'normal');
+      const sortedCategories = Array.from(hoursByCategory.entries()).sort((a, b) => b[1].hours - a[1].hours);
+      
+      sortedCategories.forEach(([categoryName, data]) => {
+        if (categoryYPosition > 250) {
+          pdf.addPage();
+          categoryYPosition = 30;
+        }
+        
+        const percentage = totalHours > 0 ? (data.hours / totalHours * 100).toFixed(1) : '0';
+        pdf.text(categoryName, 20, categoryYPosition);
+        pdf.text(`${data.hours.toFixed(2)} h`, 80, categoryYPosition);
+        pdf.text(`${data.cost.toFixed(2)} CHF`, 120, categoryYPosition);
+        pdf.text(`${percentage}%`, 160, categoryYPosition);
+        categoryYPosition += 6;
+      });
+    }
     
     // Détails des entrées avec descriptions
-    let yPosition = 115;
+    let detailsYPosition = categoryYPosition > 200 ? categoryYPosition + 20 : categoryYPosition + 10;
     pdf.setFont('helvetica', 'bold');
-    pdf.text('Détail des heures et commentaires:', 20, yPosition);
-    yPosition += 10;
+    pdf.text('Détail des heures et commentaires:', 20, detailsYPosition);
+    detailsYPosition += 10;
     
     pdf.setFontSize(9);
     pdf.setFont('helvetica', 'normal');
     
     if (chantierEntries.length === 0) {
-      pdf.text('Aucune entrée pour ce mois', 20, yPosition);
+      pdf.text('Aucune entrée pour ce chantier', 20, detailsYPosition);
     } else {
       // Grouper par date
       const entriesByDate = chantierEntries.reduce((acc, entry) => {
@@ -173,40 +236,40 @@ export class PDFExportService {
       const sortedDates = Object.keys(entriesByDate).sort();
       
       sortedDates.forEach((date) => {
-        if (yPosition > 250) {
+        if (detailsYPosition > 250) {
           pdf.addPage();
-          yPosition = 30;
+          detailsYPosition = 30;
         }
         
         pdf.setFont('helvetica', 'bold');
-        pdf.text(format(new Date(date), 'dd/MM/yyyy', { locale: fr }), 20, yPosition);
+        pdf.text(format(new Date(date), 'dd/MM/yyyy', { locale: fr }), 20, detailsYPosition);
         pdf.setFont('helvetica', 'normal');
-        yPosition += 6;
+        detailsYPosition += 6;
         
         entriesByDate[date].forEach((entry) => {
           const employee = employees.find(emp => emp.id === entry.employeeId);
           const category = categories.find(c => c.id === entry.hourCategoryId);
           
-          if (yPosition > 270) {
+          if (detailsYPosition > 270) {
             pdf.addPage();
-            yPosition = 30;
+            detailsYPosition = 30;
           }
           
           const empName = employee ? `${employee.prenom} ${employee.nom}` : 'Inconnu';
           const catStr = category ? ` [${category.nom}]` : '';
           
-          pdf.text(`  ${empName}${catStr}: ${entry.heures.toFixed(2)}h`, 20, yPosition);
-          yPosition += 4;
+          pdf.text(`  ${empName}${catStr}: ${entry.heures.toFixed(2)}h`, 20, detailsYPosition);
+          detailsYPosition += 4;
           
           if (entry.description) {
             pdf.setFontSize(8);
-            pdf.text(`    Note: ${entry.description}`, 20, yPosition);
+            pdf.text(`    Note: ${entry.description}`, 20, detailsYPosition);
             pdf.setFontSize(9);
-            yPosition += 4;
+            detailsYPosition += 4;
           }
         });
         
-        yPosition += 3;
+        detailsYPosition += 3;
       });
     }
     
@@ -216,7 +279,7 @@ export class PDFExportService {
     pdf.text(`Généré le ${format(new Date(), 'dd/MM/yyyy HH:mm', { locale: fr })}`, pageWidth / 2, 280, { align: 'center' });
     
     // Télécharger le PDF
-    const fileName = `bilan_${chantier.nom}_${month}.pdf`.replace(/\s+/g, '_');
+    const fileName = `bilan_complet_${chantier.nom}.pdf`.replace(/\s+/g, '_');
     pdf.save(fileName);
   }
 

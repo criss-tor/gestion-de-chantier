@@ -67,6 +67,7 @@ export default function Heures() {
   const [entryDescription, setEntryDescription] = useState('');
   const [editingEntry, setEditingEntry] = useState<any>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // États pour la pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -115,6 +116,15 @@ export default function Heures() {
   const handleAddEntry = async () => {
     if (!selectedEmployeeId || !entryDate || (!entryHeures || entryHeures === '0')) return;
 
+    // Validation des règles chantier/catégorie
+    const validationError = validateEntry();
+    if (!validationError.valid) {
+      alert(validationError.message);
+      return;
+    }
+
+    setIsSubmitting(true); // Démarrer le chargement
+    
     const totalHours = parseFloat(entryHeures) + (parseFloat(entryMinutes) || 0) / 60;
     const newEntry = {
       id: Date.now().toString(),
@@ -126,19 +136,29 @@ export default function Heures() {
       description: entryDescription,
     };
 
-    if (isOffline) {
-      addTimeEntryOffline(newEntry);
-    } else {
-      await addTimeEntry(newEntry);
-    }
+    try {
+      if (isOffline) {
+        addTimeEntryOffline(newEntry);
+      } else {
+        await addTimeEntry(newEntry);
+      }
 
-    // Réinitialiser le formulaire
-    setEntryDate(new Date().toISOString().slice(0, 10));
-    setEntryHeures('8');
-    setEntryMinutes('0');
-    setEntryDescription('');
-    setSelectedChantierId('');
-    setSelectedHourCategoryId('');
+      // Réinitialiser le formulaire
+      setEntryDate(new Date().toISOString().slice(0, 10));
+      setEntryHeures('0');
+      setEntryMinutes('0');
+      setEntryDescription('');
+      setSelectedChantierId('');
+      setSelectedHourCategoryId('');
+      
+      // Feedback visuel de succès
+      setTimeout(() => {
+        setIsSubmitting(false);
+      }, 1000);
+    } catch (error) {
+      console.error('Erreur lors de l\'ajout de l\'entrée:', error);
+      setIsSubmitting(false);
+    }
   };
 
   const handleEditEntry = (entry: any) => {
@@ -152,10 +172,38 @@ export default function Heures() {
     setEntryHeures(hours.toString());
     setEntryMinutes(minutes.toString());
     setEntryDescription(entry.description || '');
-    setShowEditDialog(true);
+  };
+
+  // Fonction de validation pour les règles chantier/catégorie
+  const validateEntry = () => {
+    const selectedCategory = hourCategories.find(cat => cat.id === selectedHourCategoryId);
+    const categoryName = selectedCategory?.nom?.toLowerCase();
+    
+    // Règle 1: Si catégorie atelier/pose/dessin, chantier obligatoire
+    if (categoryName && ['atelier', 'pose', 'dessin'].includes(categoryName) && !selectedChantierId) {
+      return { valid: false, message: 'Pour la catégorie ' + selectedCategory.nom + ', un chantier est obligatoire' };
+    }
+    
+    // Règle 2: Si chantier sélectionné, catégorie doit être atelier/pose/dessin
+    if (selectedChantierId && categoryName && !['atelier', 'pose', 'dessin'].includes(categoryName)) {
+      return { valid: false, message: 'Pour un chantier, la catégorie doit être Atelier, Pose ou Dessin' };
+    }
+    
+    // Règle 3: Catégorie divers/absent n'exigent pas de chantier (valide automatiquement)
+    if (categoryName && ['divers', 'absent'].includes(categoryName)) {
+      return { valid: true, message: '' };
+    }
+    
+    return { valid: true, message: '' };
   };
 
   const handleUpdateEntry = async () => {
+    const validationError = validateEntry();
+    if (!validationError.valid) {
+      alert(validationError.message);
+      return;
+    }
+
     if (!editingEntry || !selectedEmployeeId || !entryDate) return;
 
     const totalHours = parseFloat(entryHeures) + (parseFloat(entryMinutes) || 0) / 60;
@@ -346,12 +394,28 @@ export default function Heures() {
           </div>
 
           <div className={`flex gap-3 ${isMobile ? 'flex-col' : ''}`}>
+            {/* Message d'erreur de validation */}
+            {!validateEntry().valid && (
+              <div className="w-full p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+                <p className="text-sm text-destructive font-medium">{validateEntry().message}</p>
+              </div>
+            )}
+            
             <Button 
               onClick={handleAddEntry} 
-              disabled={!selectedEmployeeId || !entryDate || (!entryHeures || entryHeures === '0')}
+              disabled={!selectedEmployeeId || !entryDate || (!entryHeures || entryHeures === '0') || isSubmitting || !validateEntry().valid}
               className={`${isMobile ? 'h-12 text-base' : ''}`}
             >
-              <Check className="mr-2 h-4 w-4" />Valider ({entryHeures}h{entryMinutes !== '0' ? entryMinutes : ''})
+              {isSubmitting ? (
+                <>
+                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-t-2 border-b-2 border-r-2 border-l-2 border-gray-300"></div>
+                  Validation...
+                </>
+              ) : (
+                <>
+                  <Check className="mr-2 h-4 w-4" />Valider ({entryHeures}h{entryMinutes !== '0' ? entryMinutes : ''})
+                </>
+              )}
             </Button>
           </div>
         </CardContent>

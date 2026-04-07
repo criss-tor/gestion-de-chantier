@@ -29,7 +29,14 @@ export function useEmployeeStore() {
         supabase.from('time_entries').select('*'),
         supabase.from('material_costs').select('*'),
       ]);
-      setEmployees((empRes.data || []).map(e => ({ id: e.id, nom: e.nom, prenom: e.prenom, coutHoraire: Number(e.cout_horaire), role: e.role || 'employe', pin: e.pin || '0000' })));
+      setEmployees((empRes.data || []).map((e: any) => ({ 
+        id: e.id, 
+        nom: e.nom, 
+        prenom: e.prenom, 
+        coutHoraire: Number(e.cout_horaire), 
+        role: e.role || 'employe', 
+        pin: e.pin || '0000' 
+      })));
       const fetchedCategories = (catRes.data || []).map(c => ({ id: c.id, nom: c.nom, pourcentage: Number(c.pourcentage), isBureau: c.is_bureau }));
       setHourCategories(fetchedCategories);
 
@@ -183,9 +190,26 @@ export function useEmployeeStore() {
   }, []);
 
   const deleteHourCategory = useCallback(async (id: string) => {
-    setHourCategories(prev => prev.filter(cat => cat.id !== id));
-    await supabase.from('hour_categories').delete().eq('id', id);
-  }, []);
+    try {
+      // Supprimer d'abord de l'état local pour éviter les réaffichages
+      setHourCategories(prev => prev.filter(cat => cat.id !== id));
+      
+      // Puis supprimer de la base de données
+      const { error } = await supabase.from('hour_categories').delete().eq('id', id);
+      
+      if (error) {
+        console.error('Erreur lors de la suppression de la catégorie:', error);
+        // En cas d'erreur, recharger les données depuis la base
+        await loadAll();
+      } else {
+        console.log('Catégorie supprimée avec succès:', id);
+      }
+    } catch (error) {
+      console.error('Erreur inattendue lors de la suppression:', error);
+      // Recharger les données en cas d'erreur
+      await loadAll();
+    }
+  }, [loadAll]);
 
   const restoreData = useCallback(async (data: {
     employees: Employee[];
