@@ -157,7 +157,7 @@ export class PDFExportService {
     chantierEntries.forEach(entry => {
       const employee = employees.find(emp => emp.id === entry.employeeId);
       const category = categories.find(c => c.id === entry.hourCategoryId);
-      const categoryName = category ? category.nom : 'Standard';
+      const categoryName = category ? category.nom : 'Non défini';
       const entryCost = entry.heures * (employee?.coutHoraire || 0);
       
       const existing = hoursByCategory.get(categoryName) || { hours: 0, cost: 0, name: categoryName };

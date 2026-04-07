@@ -409,13 +409,6 @@ export default function Heures() {
           </div>
 
           <div className={`flex gap-3 ${isMobile ? 'flex-col' : ''}`}>
-            {/* Message d'erreur de validation */}
-            {!validateEntry().valid && (
-              <div className="w-full p-3 bg-destructive/10 border border-destructive/20 rounded-md">
-                <p className="text-sm text-destructive font-medium">{validateEntry().message}</p>
-              </div>
-            )}
-            
             <Button 
               onClick={handleAddEntry} 
               disabled={!selectedEmployeeId || !entryDate || (!entryHeures || entryHeures === '0') || isSubmitting || !validateEntry().valid}
