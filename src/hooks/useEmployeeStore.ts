@@ -18,41 +18,43 @@ export function useEmployeeStore() {
   const [hourCategories, setHourCategories] = useState<HourCategory[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Load all data from Supabase on mount
-  useEffect(() => {
-    async function loadAll() {
-      setLoading(true);
-      const [empRes, catRes, chRes, teRes, mcRes] = await Promise.all([
-        supabase.from('employees').select('*'),
-        supabase.from('hour_categories').select('*'),
-        supabase.from('chantiers').select('*'),
-        supabase.from('time_entries').select('*'),
-        supabase.from('material_costs').select('*'),
-      ]);
-      setEmployees((empRes.data || []).map((e: any) => ({ 
-        id: e.id, 
-        nom: e.nom, 
-        prenom: e.prenom, 
-        coutHoraire: Number(e.cout_horaire), 
-        role: e.role || 'employe', 
-        pin: e.pin || '0000' 
-      })));
-      const fetchedCategories = (catRes.data || []).map(c => ({ id: c.id, nom: c.nom, pourcentage: Number(c.pourcentage), isBureau: c.is_bureau }));
-      setHourCategories(fetchedCategories);
+  // Load all data from Supabase
+  const loadAllData = useCallback(async () => {
+    setLoading(true);
+    const [empRes, catRes, chRes, teRes, mcRes] = await Promise.all([
+      supabase.from('employees').select('*'),
+      supabase.from('hour_categories').select('*'),
+      supabase.from('chantiers').select('*'),
+      supabase.from('time_entries').select('*'),
+      supabase.from('material_costs').select('*'),
+    ]);
+    setEmployees((empRes.data || []).map((e: any) => ({ 
+      id: e.id, 
+      nom: e.nom, 
+      prenom: e.prenom, 
+      coutHoraire: Number(e.cout_horaire), 
+      role: e.role || 'employe', 
+      pin: e.pin || '0000' 
+    })));
+    const fetchedCategories = (catRes.data || []).map(c => ({ id: c.id, nom: c.nom, pourcentage: Number(c.pourcentage), isBureau: c.is_bureau }));
+    setHourCategories(fetchedCategories);
 
-      setChantiers((chRes.data || []).map(c => ({
-        id: c.id,
-        nom: c.nom,
-        description: c.description || undefined,
-        devis: c.devis !== undefined && c.devis !== null ? Number(c.devis) : 0,
-        heuresPrevues: c.heures_prevues !== undefined && c.heures_prevues !== null ? Number(c.heures_prevues) : 0,
-      })));
-      setTimeEntries((teRes.data || []).map(e => ({ id: e.id, employeeId: e.employee_id, chantierId: e.chantier_id || undefined, date: e.date, heures: Number(e.heures), description: e.description || undefined, hourCategoryId: e.hour_category_id || undefined })));
-      setMaterialCosts((mcRes.data || []).map(c => ({ id: c.id, chantierId: c.chantier_id, date: c.date, montant: Number(c.montant), description: c.description })));
-      setLoading(false);
-    }
-    loadAll();
+    setChantiers((chRes.data || []).map(c => ({
+      id: c.id,
+      nom: c.nom,
+      description: c.description || undefined,
+      devis: c.devis !== undefined && c.devis !== null ? Number(c.devis) : 0,
+      heuresPrevues: c.heures_prevues !== undefined && c.heures_prevues !== null ? Number(c.heures_prevues) : 0,
+    })));
+    setTimeEntries((teRes.data || []).map(e => ({ id: e.id, employeeId: e.employee_id, chantierId: e.chantier_id || undefined, date: e.date, heures: Number(e.heures), description: e.description || undefined, hourCategoryId: e.hour_category_id || undefined })));
+    setMaterialCosts((mcRes.data || []).map(c => ({ id: c.id, chantierId: c.chantier_id, date: c.date, montant: Number(c.montant), description: c.description })));
+    setLoading(false);
   }, []);
+
+  // Load all data on mount
+  useEffect(() => {
+    loadAllData();
+  }, [loadAllData]);
 
   const addEmployee = useCallback(async (employee: Omit<Employee, 'id'>) => {
     const id = Date.now().toString();
@@ -200,16 +202,16 @@ export function useEmployeeStore() {
       if (error) {
         console.error('Erreur lors de la suppression de la catégorie:', error);
         // En cas d'erreur, recharger les données depuis la base
-        await loadAll();
+        await loadAllData();
       } else {
         console.log('Catégorie supprimée avec succès:', id);
       }
     } catch (error) {
       console.error('Erreur inattendue lors de la suppression:', error);
       // Recharger les données en cas d'erreur
-      await loadAll();
+      await loadAllData();
     }
-  }, [loadAll]);
+  }, [loadAllData]);
 
   const restoreData = useCallback(async (data: {
     employees: Employee[];
