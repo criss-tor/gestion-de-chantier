@@ -179,18 +179,33 @@ export default function Heures() {
     const selectedCategory = hourCategories.find(cat => cat.id === selectedHourCategoryId);
     const categoryName = selectedCategory?.nom?.toLowerCase();
     
-    // Règle 1: Si catégorie atelier/pose/dessin, chantier obligatoire
+    // Cas 1: Aucun chantier ET aucune catégorie sélectionnées -> invalide
+    if (!selectedChantierId && !selectedHourCategoryId) {
+      return { valid: false, message: 'Vous devez sélectionner soit (chantier + catégorie Atelier/Pose/Dessin) soit (catégorie Divers/Absent)' };
+    }
+    
+    // Cas 2: Chantier sélectionné sans catégorie -> invalide
+    if (selectedChantierId && !selectedHourCategoryId) {
+      return { valid: false, message: 'Pour un chantier, une catégorie est obligatoire (Atelier, Pose ou Dessin)' };
+    }
+    
+    // Cas 3: Catégorie atelier/pose/dessin sans chantier -> invalide
     if (categoryName && ['atelier', 'pose', 'dessin'].includes(categoryName) && !selectedChantierId) {
       return { valid: false, message: 'Pour la catégorie ' + selectedCategory.nom + ', un chantier est obligatoire' };
     }
     
-    // Règle 2: Si chantier sélectionné, catégorie doit être atelier/pose/dessin
+    // Cas 4: Chantier sélectionné avec catégorie non valide -> invalide
     if (selectedChantierId && categoryName && !['atelier', 'pose', 'dessin'].includes(categoryName)) {
       return { valid: false, message: 'Pour un chantier, la catégorie doit être Atelier, Pose ou Dessin' };
     }
     
-    // Règle 3: Catégorie divers/absent n'exigent pas de chantier (valide automatiquement)
-    if (categoryName && ['divers', 'absent'].includes(categoryName)) {
+    // Cas 5: Catégorie divers/absent sans chantier -> valide
+    if (categoryName && ['divers', 'absent'].includes(categoryName) && !selectedChantierId) {
+      return { valid: true, message: '' };
+    }
+    
+    // Cas 6: Chantier + catégorie atelier/pose/dessin -> valide
+    if (selectedChantierId && categoryName && ['atelier', 'pose', 'dessin'].includes(categoryName)) {
       return { valid: true, message: '' };
     }
     
