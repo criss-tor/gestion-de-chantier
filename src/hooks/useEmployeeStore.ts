@@ -331,7 +331,9 @@ export function useEmployeeStore() {
       const heuresBureau = totalBureauHours * ratio;
       const coutBureau = totalBureauCost * ratio;
 
-      return { chantierId: chantier.id, chantierNom: chantier.nom, heures, coutMain, coutMateriel, coutTotal: coutMain + coutMateriel + coutBureau, heuresBureau, coutBureau };
+      // Les coûts de bureau ne sont pas ajoutés au coût total du chantier
+      // car ce sont des frais généraux déjà compris dans le prix à l'heure des employés
+      return { chantierId: chantier.id, chantierNom: chantier.nom, heures, coutMain, coutMateriel, coutTotal: coutMain + coutMateriel, heuresBureau, coutBureau };
     });
   }, [chantiers, timeEntries, materialCosts, getEntryCost]);
 

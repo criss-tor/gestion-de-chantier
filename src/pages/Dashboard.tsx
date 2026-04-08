@@ -249,7 +249,7 @@ const Dashboard = () => {
       </div>
 
       {/* Monthly Stats */}
-      <div className="grid grid-cols-1 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Heures du mois</CardTitle>
@@ -258,6 +258,25 @@ const Dashboard = () => {
           <CardContent>
             <div className="text-2xl font-bold">{formatHoursDecimalWithH(monthlyStats.totalHeures)}</div>
             <p className="text-xs text-muted-foreground">{format(currentDate, 'MMMM yyyy', { locale: fr })}</p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Détail des heures</CardTitle>
+            <HardHat className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm">Heures chantier:</span>
+                <span className="font-semibold">{formatHoursDecimalWithH(monthlyStats.totalHeures - monthlyStats.totalBureauHours)} h</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm">Heures bureau:</span>
+                <span className="font-semibold">{formatHoursDecimalWithH(monthlyStats.totalBureauHours)} h</span>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -411,16 +430,16 @@ const Dashboard = () => {
                     </TableHeader>
                     <TableBody>
                       {monthlyChantierStats.map((s) => {
-                      const total = s.heures + s.heuresBureau;
-                      const pct = totalAllHours > 0 ? total / totalAllHours * 100 : 0;
+                      // Les heures de bureau sont exclues du calcul car ce sont des frais généraux
+                      const pct = totalAllHours > 0 ? s.heures / totalAllHours * 100 : 0;
                       return (
                         <TableRow key={s.nom}>
                             <TableCell className="font-medium">{s.nom}</TableCell>
                             <TableCell className="text-right">{formatHoursDecimalWithH(s.heures)} h</TableCell>
                             <TableCell className="text-right text-muted-foreground">{formatHoursDecimalWithH(s.heuresBureau)} h</TableCell>
-                            <TableCell className="text-right font-medium">{formatHoursDecimalWithH(total)} h</TableCell>
+                            <TableCell className="text-right font-medium">{formatHoursDecimalWithH(s.heures)} h</TableCell>
                       <TableCell className="text-right">{formatHoursDecimalWithH(s.heuresPrevues)} h</TableCell>
-                      <TableCell className={`text-right font-medium ${ (total - s.heuresPrevues) > 0 ? 'text-destructive' : 'text-primary' }`}>{formatHoursDecimalWithH(total - s.heuresPrevues)} h</TableCell>
+                      <TableCell className={`text-right font-medium ${ (s.heures - s.heuresPrevues) > 0 ? 'text-destructive' : 'text-primary' }`}>{formatHoursDecimalWithH(s.heures - s.heuresPrevues)} h</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <div className="flex-1 h-3 bg-secondary rounded-full overflow-hidden">
@@ -432,7 +451,7 @@ const Dashboard = () => {
                           <span className="text-xs font-semibold text-muted-foreground w-10 text-right">{pct.toFixed(0)}%</span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-right font-semibold text-primary">{formatCurrency(s.cout + s.coutBureau)}</TableCell>
+                      <TableCell className="text-right font-semibold text-primary">{formatCurrency(s.cout)}</TableCell>
                           </TableRow>);
 
                     })}
