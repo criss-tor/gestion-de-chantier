@@ -117,7 +117,10 @@ const Dashboard = () => {
     const monthEntries = timeEntries.filter((e) => e.date.startsWith(monthStr));
     const totalHeures = monthEntries.reduce((s, e) => s + e.heures, 0);
     const totalCout = monthEntries.reduce((s, e) => s + getEntryCost(e), 0);
-    return { totalHeures, totalCout };
+    // Calculer les heures de bureau (entrées sans chantier)
+    const bureauEntries = monthEntries.filter((e) => !e.chantierId);
+    const totalBureauHours = bureauEntries.reduce((s, e) => s + e.heures, 0);
+    return { totalHeures, totalCout, totalBureauHours };
   }, [timeEntries, currentDate, getEntryCost]);
 
   const monthlyChantierStats = useMemo(() => {
@@ -384,11 +387,12 @@ const Dashboard = () => {
               </div>
             ) : (
               (() => {
-              const totalAllHours = monthlyChantierStats.reduce((s, c) => s + c.heures + c.heuresBureau, 0);
+              // Les heures de bureau sont exclues car ce sont des frais généraux non répartis sur les chantiers
+              const totalAllHours = monthlyChantierStats.reduce((s, c) => s + c.heures, 0);
               const chartData = monthlyChantierStats.map((s) => {
-                const cost = s.cout + s.coutBureau;
+                const cost = s.cout;
                 const pctCost = s.devis > 0 ? Math.min(200, (cost / s.devis) * 100) : 0;
-                const reelHeures = s.heures + s.heuresBureau;
+                const reelHeures = s.heures;
                 const pctHeures = s.heuresPrevues > 0 ? Math.min(200, (reelHeures / s.heuresPrevues) * 100) : 0;
                 return {
                   name: s.nom,
@@ -419,13 +423,11 @@ const Dashboard = () => {
                     <TableHeader>
                       <TableRow className="hover:bg-transparent">
                         <TableHead className="font-semibold">Chantier</TableHead>
-                        <TableHead className="font-semibold text-right">Heures directes</TableHead>
-                        <TableHead className="font-semibold text-right">Heures bureau</TableHead>
-                        <TableHead className="font-semibold text-right">Total</TableHead>
-                        <TableHead className="font-semibold text-right">Prévu</TableHead>
+                        <TableHead className="font-semibold text-right">Heures chantier</TableHead>
+                        <TableHead className="font-semibold text-right">Heures prévues</TableHead>
                         <TableHead className="font-semibold text-right">Écart</TableHead>
-                        <TableHead className="font-semibold min-w-[160px]">Répartition</TableHead>
-                        <TableHead className="font-semibold text-right">Coût</TableHead>
+                        <TableHead className="font-semibold min-w-[160px]">% répartition</TableHead>
+                        <TableHead className="font-semibold text-right">Coût main d'œuvre</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -435,23 +437,21 @@ const Dashboard = () => {
                       return (
                         <TableRow key={s.nom}>
                             <TableCell className="font-medium">{s.nom}</TableCell>
-                            <TableCell className="text-right">{formatHoursDecimalWithH(s.heures)} h</TableCell>
-                            <TableCell className="text-right text-muted-foreground">{formatHoursDecimalWithH(s.heuresBureau)} h</TableCell>
                             <TableCell className="text-right font-medium">{formatHoursDecimalWithH(s.heures)} h</TableCell>
-                      <TableCell className="text-right">{formatHoursDecimalWithH(s.heuresPrevues)} h</TableCell>
-                      <TableCell className={`text-right font-medium ${ (s.heures - s.heuresPrevues) > 0 ? 'text-destructive' : 'text-primary' }`}>{formatHoursDecimalWithH(s.heures - s.heuresPrevues)} h</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 h-3 bg-secondary rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-primary rounded-full transition-all duration-500"
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
-                          <span className="text-xs font-semibold text-muted-foreground w-10 text-right">{pct.toFixed(0)}%</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right font-semibold text-primary">{formatCurrency(s.cout)}</TableCell>
+                            <TableCell className="text-right">{formatHoursDecimalWithH(s.heuresPrevues)} h</TableCell>
+                            <TableCell className={`text-right font-medium ${ (s.heures - s.heuresPrevues) > 0 ? 'text-destructive' : 'text-primary' }`}>{formatHoursDecimalWithH(s.heures - s.heuresPrevues)} h</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 h-3 bg-secondary rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-primary rounded-full transition-all duration-500"
+                                    style={{ width: `${pct}%` }}
+                                  />
+                                </div>
+                                <span className="text-xs font-semibold text-muted-foreground w-10 text-right">{pct.toFixed(0)}%</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right font-semibold text-primary">{formatCurrency(s.cout)}</TableCell>
                           </TableRow>);
 
                     })}
