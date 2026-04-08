@@ -114,7 +114,9 @@ export default function Heures() {
   };
 
   const handleAddEntry = async () => {
-    if (!selectedEmployeeId || !entryDate || (!entryHeures || entryHeures === '0')) return;
+    // Vérifier qu'il y a au moins des heures ou des minutes
+    const totalHours = parseFloat(entryHeures || '0') + (parseFloat(entryMinutes || '0') / 60);
+    if (!selectedEmployeeId || !entryDate || totalHours <= 0) return;
 
     // Validation des règles chantier/catégorie
     const validationError = validateEntry();
@@ -125,14 +127,13 @@ export default function Heures() {
 
     setIsSubmitting(true); // Démarrer le chargement
     
-    const totalHours = parseFloat(entryHeures) + (parseFloat(entryMinutes) || 0) / 60;
     const newEntry = {
       id: Date.now().toString(),
       employeeId: selectedEmployeeId,
       chantierId: selectedChantierId || null,
       hourCategoryId: selectedHourCategoryId || null,
       date: entryDate,
-      heures: totalHours,
+      heures: totalHours,  // Utilise totalHours calculé plus haut
       description: entryDescription,
     };
 
@@ -411,7 +412,7 @@ export default function Heures() {
           <div className={`flex gap-3 ${isMobile ? 'flex-col' : ''}`}>
             <Button 
               onClick={handleAddEntry} 
-              disabled={!selectedEmployeeId || !entryDate || (!entryHeures || entryHeures === '0') || isSubmitting || !validateEntry().valid}
+              disabled={!selectedEmployeeId || !entryDate || (parseFloat(entryHeures || '0') + parseFloat(entryMinutes || '0') / 60) <= 0 || isSubmitting || !validateEntry().valid}
               className={`${isMobile ? 'h-12 text-base' : ''}`}
             >
               {isSubmitting ? (
