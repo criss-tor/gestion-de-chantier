@@ -222,7 +222,7 @@ export default function Heures() {
 
     if (!editingEntry || !selectedEmployeeId || !entryDate) return;
 
-    const totalHours = parseFloat(entryHeures) + (parseFloat(entryMinutes) || 0) / 60;
+    const totalHours = parseFloat(entryHeures || '0') + (parseFloat(entryMinutes || '0')) / 60;
     const updatedEntry = {
       ...editingEntry,
       employeeId: selectedEmployeeId,
@@ -333,7 +333,7 @@ export default function Heures() {
                   min="0" 
                   max="23" 
                   value={entryHeures} 
-                  onChange={(e) => setEntryHeures(e.target.value)} 
+                  onChange={(e) => setEntryHeures(e.target.value === '' ? '0' : e.target.value)} 
                   className={`${isMobile ? 'h-12 w-16 text-base' : 'text-lg py-3 px-4 w-14'}`} 
                   placeholder="0" 
                 />
@@ -344,7 +344,7 @@ export default function Heures() {
                   min="0" 
                   max="59" 
                   value={entryMinutes} 
-                  onChange={(e) => setEntryMinutes(e.target.value)} 
+                  onChange={(e) => setEntryMinutes(e.target.value === '' ? '0' : e.target.value)} 
                   className={`${isMobile ? 'h-12 w-16 text-base' : 'text-lg py-3 px-4 w-14'}`} 
                   placeholder="0" 
                 />
@@ -585,11 +585,11 @@ export default function Heures() {
             </div>
             <div className="grid gap-2">
               <Label>Heures</Label>
-              <Input type="number" step="1" min="0" max="23" value={entryHeures} onChange={(e) => setEntryHeures(e.target.value)} />
+              <Input type="number" step="1" min="0" max="23" value={entryHeures} onChange={(e) => setEntryHeures(e.target.value === '' ? '0' : e.target.value)} />
             </div>
             <div className="grid gap-2">
               <Label>Minutes</Label>
-              <Input type="number" step="15" min="0" max="59" value={entryMinutes} onChange={(e) => setEntryMinutes(e.target.value)} />
+              <Input type="number" step="15" min="0" max="59" value={entryMinutes} onChange={(e) => setEntryMinutes(e.target.value === '' ? '0' : e.target.value)} />
             </div>
             <div className="grid gap-2">
               <Label>Description</Label>
