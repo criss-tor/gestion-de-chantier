@@ -303,10 +303,10 @@ export default function Heures() {
               )}
             </div>
 
-            <div className="grid gap-2">
-              <Label className={isMobile ? 'text-base' : ''}>Chantier</Label>
+            <div className="grid gap-2 p-3 border-2 border-blue-200 rounded-lg bg-blue-50/30">
+              <Label className={`${isMobile ? 'text-base' : ''} text-blue-700 font-semibold`}>Chantier</Label>
               <select
-                className={`input ${isMobile ? 'h-12 text-base' : 'text-lg py-3 px-4'}`}
+                className={`input ${isMobile ? 'h-12 text-base' : 'text-lg py-3 px-4'} border-blue-200 focus:border-blue-500 focus:ring-blue-500`}
                 value={selectedChantierId}
                 onChange={(e) => setSelectedChantierId(e.target.value)}
               >
@@ -381,10 +381,10 @@ export default function Heures() {
               </div>
             </div>
             
-            <div className="grid gap-2">
-              <Label className={isMobile ? 'text-base' : ''}>Catégorie</Label>
+            <div className="grid gap-2 p-3 border-2 border-green-200 rounded-lg bg-green-50/30">
+              <Label className={`${isMobile ? 'text-base' : ''} text-green-700 font-semibold`}>Catégorie</Label>
               <select
-                className={`input ${isMobile ? 'h-12 text-base' : 'text-lg py-3 px-4'}`}
+                className={`input ${isMobile ? 'h-12 text-base' : 'text-lg py-3 px-4'} border-green-200 focus:border-green-500 focus:ring-green-500`}
                 value={selectedHourCategoryId}
                 onChange={(e) => setSelectedHourCategoryId(e.target.value)}
               >

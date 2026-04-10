@@ -272,12 +272,14 @@ export class PDFExportService {
     if (chantierEntries.length === 0) {
       pdf.text('Aucune entrée pour ce chantier', 20, detailsYPosition);
     } else {
-      // Grouper par date
+      // Grouper par date, puis par catégorie
       const entriesByDate = chantierEntries.reduce((acc, entry) => {
-        if (!acc[entry.date]) acc[entry.date] = [];
-        acc[entry.date].push(entry);
+        if (!acc[entry.date]) acc[entry.date] = {};
+        const catId = entry.hourCategoryId || 'none';
+        if (!acc[entry.date][catId]) acc[entry.date][catId] = [];
+        acc[entry.date][catId].push(entry);
         return acc;
-      }, {} as Record<string, TimeEntry[]>);
+      }, {} as Record<string, Record<string, TimeEntry[]>>);
       
       const sortedDates = Object.keys(entriesByDate).sort();
       
@@ -287,35 +289,57 @@ export class PDFExportService {
           detailsYPosition = 30;
         }
         
+        // Date en gras
         pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(10);
         pdf.text(format(new Date(date), 'dd/MM/yyyy', { locale: fr }), 20, detailsYPosition);
         pdf.setFont('helvetica', 'normal');
-        detailsYPosition += 6;
+        detailsYPosition += 8;
         
-        entriesByDate[date].forEach((entry) => {
-          const employee = employees.find(emp => emp.id === entry.employeeId);
-          const category = categories.find(c => c.id === entry.hourCategoryId);
-          
+        // Grouper par catégorie pour cette date
+        const entriesByCategory = entriesByDate[date];
+        
+        Object.entries(entriesByCategory).forEach(([catId, entries]) => {
           if (detailsYPosition > 270) {
             pdf.addPage();
             detailsYPosition = 30;
           }
           
-          const empName = employee ? `${employee.prenom} ${employee.nom}` : 'Inconnu';
-          const catStr = category ? ` [${category.nom}]` : '';
+          // Nom de catégorie en italique
+          const category = categories.find(c => c.id === catId);
+          const catName = category ? category.nom : 'Non défini';
+          pdf.setFont('helvetica', 'italic');
+          pdf.setFontSize(9);
+          pdf.text(`  ${catName}:`, 25, detailsYPosition);
+          pdf.setFont('helvetica', 'normal');
+          detailsYPosition += 5;
           
-          pdf.text(`  ${empName}${catStr}: ${entry.heures.toFixed(2)}h`, 20, detailsYPosition);
-          detailsYPosition += 4;
-          
-          if (entry.description) {
-            pdf.setFontSize(8);
-            pdf.text(`    Note: ${entry.description}`, 20, detailsYPosition);
+          // Entrées de cette catégorie
+          entries.forEach((entry) => {
+            if (detailsYPosition > 275) {
+              pdf.addPage();
+              detailsYPosition = 30;
+            }
+            
+            const employee = employees.find(emp => emp.id === entry.employeeId);
+            const empName = employee ? `${employee.prenom} ${employee.nom}` : 'Inconnu';
+            
             pdf.setFontSize(9);
+            pdf.text(`    • ${empName}: ${entry.heures.toFixed(2)}h`, 30, detailsYPosition);
             detailsYPosition += 4;
-          }
+            
+            if (entry.description) {
+              pdf.setFontSize(8);
+              pdf.text(`      "${entry.description}"`, 30, detailsYPosition);
+              pdf.setFontSize(9);
+              detailsYPosition += 4;
+            }
+          });
+          
+          detailsYPosition += 2;
         });
         
-        detailsYPosition += 3;
+        detailsYPosition += 5;
       });
     }
     
