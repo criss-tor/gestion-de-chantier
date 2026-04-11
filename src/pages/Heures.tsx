@@ -41,6 +41,7 @@ export default function Heures() {
     timeEntries,
     hourCategories,
     addTimeEntry,
+    updateTimeEntry,
     deleteTimeEntry,
     currentEmployeeId,
   } = useEmployeeContext();
@@ -223,18 +224,17 @@ export default function Heures() {
     if (!editingEntry || !selectedEmployeeId || !entryDate) return;
 
     const totalHours = parseFloat(entryHeures || '0') + (parseFloat(entryMinutes || '0')) / 60;
-    const updatedEntry = {
-      ...editingEntry,
+    
+    // Utilise updateTimeEntry pour modifier l'entrée existante
+    await updateTimeEntry(editingEntry.id, {
       employeeId: selectedEmployeeId,
       chantierId: selectedChantierId || null,
       hourCategoryId: selectedHourCategoryId || null,
       date: entryDate,
       heures: totalHours,
       description: entryDescription,
-    };
-
-    await addTimeEntry(updatedEntry);
-    await deleteTimeEntry(editingEntry.id);
+    });
+    
     setShowEditDialog(false);
     setEditingEntry(null);
   };
@@ -397,23 +397,23 @@ export default function Heures() {
               </select>
             </div>
 
-            <div className="grid gap-2">
-              <Label className={isMobile ? 'text-base' : ''}>Description</Label>
+            <div className="grid gap-2 p-3 border-2 border-amber-200 rounded-lg bg-amber-50/30">
+              <Label className={`${isMobile ? 'text-base' : ''} text-amber-700 font-semibold`}>Description</Label>
               <Input 
                 type="text" 
                 value={entryDescription} 
                 onChange={(e) => setEntryDescription(e.target.value)} 
-                className={`${isMobile ? 'h-12 text-base' : 'text-lg py-3 px-4'}`} 
+                className={`${isMobile ? 'h-12 text-base' : 'text-lg py-3 px-4'} border-amber-200 focus:border-amber-500 focus:ring-amber-500`} 
                 placeholder="Description du travail effectué..." 
               />
             </div>
           </div>
 
-          <div className={`flex gap-3 ${isMobile ? 'flex-col' : ''}`}>
+          <div className={`flex gap-3 mt-4 ${isMobile ? 'flex-col' : ''}`}>
             <Button 
               onClick={handleAddEntry} 
               disabled={!selectedEmployeeId || !entryDate || (parseFloat(entryHeures || '0') + parseFloat(entryMinutes || '0') / 60) <= 0 || isSubmitting || !validateEntry().valid}
-              className={`${isMobile ? 'h-12 text-base' : ''}`}
+              className={`${isMobile ? 'h-12 text-base' : ''} transition-all duration-1000 ${isSubmitting ? 'bg-green-500 hover:bg-green-500' : ''}`}
             >
               {isSubmitting ? (
                 <>
