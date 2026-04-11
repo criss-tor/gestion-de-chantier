@@ -115,6 +115,12 @@ export default function Heures() {
   };
 
   const handleAddEntry = async () => {
+    // Si on est en mode édition, utiliser handleUpdateEntry
+    if (editingEntry) {
+      await handleUpdateEntry();
+      return;
+    }
+
     // Vérifier qu'il y a au moins des heures ou des minutes
     const totalHours = parseFloat(entryHeures || '0') + (parseFloat(entryMinutes || '0') / 60);
     if (!selectedEmployeeId || !entryDate || totalHours <= 0) return;
@@ -174,6 +180,7 @@ export default function Heures() {
     setEntryHeures(hours.toString());
     setEntryMinutes(minutes.toString());
     setEntryDescription(entry.description || '');
+    setShowEditDialog(true); // Ouvre le dialogue d'édition
   };
 
   // Fonction de validation pour les règles chantier/catégorie
@@ -381,10 +388,10 @@ export default function Heures() {
               </div>
             </div>
             
-            <div className="grid gap-2 p-3 border-2 border-green-200 rounded-lg bg-green-50/30">
-              <Label className={`${isMobile ? 'text-base' : ''} text-green-700 font-semibold`}>Catégorie</Label>
+            <div className="grid gap-2 p-3 border-2 border-blue-200 rounded-lg bg-blue-50/30">
+              <Label className={`${isMobile ? 'text-base' : ''} text-blue-700 font-semibold`}>Catégorie</Label>
               <select
-                className={`input ${isMobile ? 'h-12 text-base' : 'text-lg py-3 px-4'} border-green-200 focus:border-green-500 focus:ring-green-500`}
+                className={`input ${isMobile ? 'h-12 text-base' : 'text-lg py-3 px-4'} border-blue-200 focus:border-blue-500 focus:ring-blue-500`}
                 value={selectedHourCategoryId}
                 onChange={(e) => setSelectedHourCategoryId(e.target.value)}
               >
@@ -397,13 +404,13 @@ export default function Heures() {
               </select>
             </div>
 
-            <div className="grid gap-2 p-3 border-2 border-amber-200 rounded-lg bg-amber-50/30">
-              <Label className={`${isMobile ? 'text-base' : ''} text-amber-700 font-semibold`}>Description</Label>
+            <div className="grid gap-2 p-3 border-2 border-blue-200 rounded-lg bg-blue-50/30">
+              <Label className={`${isMobile ? 'text-base' : ''} text-blue-700 font-semibold`}>Description</Label>
               <Input 
                 type="text" 
                 value={entryDescription} 
                 onChange={(e) => setEntryDescription(e.target.value)} 
-                className={`${isMobile ? 'h-12 text-base' : 'text-lg py-3 px-4'} border-amber-200 focus:border-amber-500 focus:ring-amber-500`} 
+                className={`${isMobile ? 'h-12 text-base' : 'text-lg py-3 px-4'} border-blue-200 focus:border-blue-500 focus:ring-blue-500`} 
                 placeholder="Description du travail effectué..." 
               />
             </div>
