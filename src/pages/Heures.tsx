@@ -591,6 +591,32 @@ export default function Heures() {
               <Input type="date" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} />
             </div>
             <div className="grid gap-2">
+              <Label>Chantier</Label>
+              <select
+                className="input h-10 text-base border rounded px-3"
+                value={selectedChantierId}
+                onChange={(e) => setSelectedChantierId(e.target.value)}
+              >
+                <option value="">(Aucun)</option>
+                {chantiers.map((ch) => (
+                  <option key={ch.id} value={ch.id}>{ch.nom}</option>
+                ))}
+              </select>
+            </div>
+            <div className="grid gap-2">
+              <Label>Catégorie</Label>
+              <select
+                className="input h-10 text-base border rounded px-3"
+                value={selectedHourCategoryId}
+                onChange={(e) => setSelectedHourCategoryId(e.target.value)}
+              >
+                <option value="">Sélectionner une catégorie</option>
+                {hourCategories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>{cat.nom}</option>
+                ))}
+              </select>
+            </div>
+            <div className="grid gap-2">
               <Label>Heures</Label>
               <Input type="number" step="1" min="0" max="23" value={entryHeures} onChange={(e) => setEntryHeures(e.target.value === '' ? '0' : e.target.value)} />
             </div>
