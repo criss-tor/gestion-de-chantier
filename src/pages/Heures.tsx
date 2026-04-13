@@ -351,7 +351,8 @@ export default function Heures() {
                   min="0" 
                   max="59" 
                   value={entryMinutes} 
-                  onChange={(e) => setEntryMinutes(e.target.value === '' ? '0' : e.target.value)} 
+                  onChange={(e) => setEntryMinutes(e.target.value)} 
+                  onBlur={(e) => setEntryMinutes(e.target.value === '' ? '0' : e.target.value)} 
                   className={`${isMobile ? 'h-12 w-16 text-base' : 'text-lg py-3 px-4 w-14'}`} 
                   placeholder="0" 
                 />
@@ -622,7 +623,7 @@ export default function Heures() {
             </div>
             <div className="grid gap-2">
               <Label>Minutes</Label>
-              <Input type="number" step="15" min="0" max="59" value={entryMinutes} onChange={(e) => setEntryMinutes(e.target.value === '' ? '0' : e.target.value)} />
+              <Input type="number" step="15" min="0" max="59" value={entryMinutes} onChange={(e) => setEntryMinutes(e.target.value)} onBlur={(e) => setEntryMinutes(e.target.value === '' ? '0' : e.target.value)} />
             </div>
             <div className="grid gap-2">
               <Label>Description</Label>
