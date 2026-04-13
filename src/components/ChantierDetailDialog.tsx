@@ -76,7 +76,8 @@ export function ChantierDetailDialog({ chantierId, open, onOpenChange }: Chantie
   // Material costs
   const chantierMaterials = materialCosts.filter((c) => c.chantierId === chantierId);
   const totalMateriel = chantierMaterials.reduce((s, c) => s + c.montant, 0);
-  const totalCost = totalMain + totalMateriel + (stat?.coutBureau || 0);
+  // Les coûts de bureau ne sont pas inclus car ce sont des frais généraux
+  const totalCost = totalMain + totalMateriel;
   const margin = (chantier.devis ?? 0) - totalCost;
 
   const handleAddMaterial = () => {
@@ -212,13 +213,7 @@ export function ChantierDetailDialog({ chantierId, open, onOpenChange }: Chantie
             <Badge variant="secondary" className="ml-auto">{totalHeures}h — {formatCurrency(totalMain)}</Badge>
           </div>
 
-          {/* Bureau hours line */}
-          {stat && stat.heuresBureau > 0 && (
-            <div className="flex items-center justify-between rounded-md bg-accent/50 p-2 text-sm">
-              <span className="text-muted-foreground italic">Bureau (réparti)</span>
-              <span className="font-medium">{formatHoursDecimalWithH(stat.heuresBureau)} — {formatCurrency(stat.coutBureau)}</span>
-            </div>
-          )}
+          {/* Les heures de bureau ne sont plus réparties sur les chantiers */}
           {employeeRows.length === 0 ? (
             <p className="text-sm text-muted-foreground py-2">Aucune heure enregistrée</p>
           ) : (
