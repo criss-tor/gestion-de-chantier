@@ -67,7 +67,7 @@ export default function GanttChart({
   const [newMarkerChantierId, setNewMarkerChantierId] = useState('');
   const [newMarkerDate, setNewMarkerDate] = useState('');
   const [newMarkerEndDate, setNewMarkerEndDate] = useState('');
-  const [newMarkerType, setNewMarkerType] = useState<GanttMarker['type']>('milestone');
+  const [newMarkerType, setNewMarkerType] = useState<GanttMarker['type']>('appointment');
   const [newMarkerLabel, setNewMarkerLabel] = useState('');
 
   // Calculate days to display
@@ -101,22 +101,12 @@ export default function GanttChart({
     return weekNumbers;
   }, [days]);
 
-  // Get only chantiers with entries this month
+  // Get all chantiers (even without entries) to show on Gantt
   const activeChantiers = useMemo(() => {
-    const monthStr = format(viewDate, 'yyyy-MM');
-    const chantierIdsWithEntries = new Set(
-      timeEntries
-        .filter((e) => e.date.startsWith(monthStr) && e.chantierId)
-        .map((e) => e.chantierId!)
-    );
-    return Array.from(chantierIdsWithEntries)
-      .map((id) => {
-        const ch = chantiers.find((c) => c.id === id);
-        return ch ? { ...ch, id: ch.id } : null;
-      })
-      .filter((c): c is Chantier => c !== null)
+    return chantiers
+      .slice()
       .sort((a, b) => a.nom.localeCompare(b.nom));
-  }, [chantiers, timeEntries, viewDate]);
+  }, [chantiers]);
 
   // Get entries for each chantier per day
   const getEntriesForChantier = (chantierId: string, day: Date) => {
@@ -153,7 +143,7 @@ export default function GanttChart({
     setNewMarkerChantierId('');
     setNewMarkerDate('');
     setNewMarkerEndDate('');
-    setNewMarkerType('milestone');
+    setNewMarkerType('appointment');
     setNewMarkerLabel('');
     setShowAddMarkerDialog(true);
   };
@@ -164,7 +154,7 @@ export default function GanttChart({
     onAddMarker?.({
       chantierId: newMarkerChantierId,
       date: newMarkerDate,
-      endDate: newMarkerType === 'range' ? newMarkerEndDate : undefined,
+      endDate: (newMarkerType === 'range' || newMarkerType === 'appointment') && newMarkerEndDate ? newMarkerEndDate : undefined,
       type: newMarkerType,
       label: newMarkerLabel,
     });
@@ -173,7 +163,7 @@ export default function GanttChart({
     setNewMarkerChantierId('');
     setNewMarkerDate('');
     setNewMarkerEndDate('');
-    setNewMarkerType('milestone');
+    setNewMarkerType('appointment');
     setNewMarkerLabel('');
     setShowAddMarkerDialog(false);
   };
@@ -285,7 +275,7 @@ export default function GanttChart({
         <CardContent>
           {activeChantiers.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              <p>Aucun chantier avec des heures enregistrées ce mois</p>
+              <p>Aucun chantier disponible</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -377,7 +367,11 @@ export default function GanttChart({
                               {dayMarkers.map((marker) => (
                                 <div
                                   key={marker.id}
-                                  className={`w-3 h-3 rounded-full ${getMarkerColor(marker.type)} cursor-pointer mx-auto`}
+                                  className={`cursor-pointer mx-auto ${
+                                    marker.type === 'range' || (marker.type === 'appointment' && marker.endDate && marker.endDate !== marker.date)
+                                      ? 'h-2 w-full rounded-sm'
+                                      : 'w-3 h-3 rounded-full'
+                                  } ${getMarkerColor(marker.type)}`}
                                   title={marker.label}
                                   onClick={() => handleMarkerClick(marker)}
                                 />
@@ -430,7 +424,6 @@ export default function GanttChart({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="milestone">Jalon (point)</SelectItem>
                   <SelectItem value="appointment">Rendez-vous</SelectItem>
                   <SelectItem value="end-date">Date de fin</SelectItem>
                   <SelectItem value="range">Plage (début-fin)</SelectItem>
@@ -446,13 +439,14 @@ export default function GanttChart({
                 onChange={(e) => setNewMarkerDate(e.target.value)}
               />
             </div>
-            {newMarkerType === 'range' && (
+            {(newMarkerType === 'range' || newMarkerType === 'appointment') && (
               <div className="grid gap-2">
-                <Label>Date de fin</Label>
+                <Label>Date de fin {newMarkerType === 'appointment' ? '(optionnelle)' : ''}</Label>
                 <Input
                   type="date"
                   value={newMarkerEndDate}
                   onChange={(e) => setNewMarkerEndDate(e.target.value)}
+                  placeholder={newMarkerType === 'appointment' ? 'Laisser vide pour 1 jour' : ''}
                 />
               </div>
             )}
