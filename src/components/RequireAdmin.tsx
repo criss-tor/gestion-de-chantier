@@ -12,7 +12,13 @@ export function RequireAdmin({ children }: RequireAdminProps) {
 
   // Attendre le chargement des employés
   if (loading) {
-    return null;
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="rounded-xl border border-border bg-card px-6 py-5 text-center shadow-sm">
+          <p className="text-sm text-muted-foreground">Chargement de l’application…</p>
+        </div>
+      </div>
+    );
   }
 
   if (!currentEmployeeId) {

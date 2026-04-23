@@ -1,8 +1,10 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Employee, TimeEntry, Chantier, MaterialCost, ChantierStats, HourCategory } from '@/types/employee';
 import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 export function useEmployeeStore() {
+  const { toast } = useToast();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [currentEmployeeId, setCurrentEmployeeId] = useState<string | null>(() => {
     const stored = window.localStorage.getItem('gc_currentEmployeeId');
@@ -18,38 +20,53 @@ export function useEmployeeStore() {
   const [hourCategories, setHourCategories] = useState<HourCategory[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const showError = useCallback((title: string, description: string, error?: unknown) => {
+    console.error(title, error);
+    toast({ title, description, variant: 'destructive' });
+  }, [toast]);
+
   // Load all data from Supabase
   const loadAllData = useCallback(async () => {
     setLoading(true);
-    const [empRes, catRes, chRes, teRes, mcRes] = await Promise.all([
-      supabase.from('employees').select('*'),
-      supabase.from('hour_categories').select('*'),
-      supabase.from('chantiers').select('*'),
-      supabase.from('time_entries').select('*'),
-      supabase.from('material_costs').select('*'),
-    ]);
-    setEmployees((empRes.data || []).map((e: any) => ({ 
-      id: e.id, 
-      nom: e.nom, 
-      prenom: e.prenom, 
-      coutHoraire: Number(e.cout_horaire), 
-      role: e.role || 'employe', 
-      pin: e.pin || '0000' 
-    })));
-    const fetchedCategories = (catRes.data || []).map(c => ({ id: c.id, nom: c.nom, pourcentage: Number(c.pourcentage), isBureau: c.is_bureau }));
-    setHourCategories(fetchedCategories);
+    try {
+      const [empRes, catRes, chRes, teRes, mcRes] = await Promise.all([
+        supabase.from('employees').select('*'),
+        supabase.from('hour_categories').select('*'),
+        supabase.from('chantiers').select('*'),
+        supabase.from('time_entries').select('*'),
+        supabase.from('material_costs').select('*'),
+      ]);
 
-    setChantiers((chRes.data || []).map(c => ({
-      id: c.id,
-      nom: c.nom,
-      description: c.description || undefined,
-      devis: c.devis !== undefined && c.devis !== null ? Number(c.devis) : 0,
-      heuresPrevues: c.heures_prevues !== undefined && c.heures_prevues !== null ? Number(c.heures_prevues) : 0,
-    })));
-    setTimeEntries((teRes.data || []).map(e => ({ id: e.id, employeeId: e.employee_id, chantierId: e.chantier_id || undefined, date: e.date, heures: Number(e.heures), description: e.description || undefined, hourCategoryId: e.hour_category_id || undefined })));
-    setMaterialCosts((mcRes.data || []).map(c => ({ id: c.id, chantierId: c.chantier_id, date: c.date, montant: Number(c.montant), description: c.description })));
-    setLoading(false);
-  }, []);
+      if (empRes.error || catRes.error || chRes.error || teRes.error || mcRes.error) {
+        showError('Erreur de chargement', 'Impossible de récupérer certaines données depuis Supabase.');
+      }
+
+      setEmployees((empRes.data || []).map((e: { id: string; nom: string; prenom: string; cout_horaire: number; role?: string; pin?: string }) => ({ 
+        id: e.id, 
+        nom: e.nom, 
+        prenom: e.prenom, 
+        coutHoraire: Number(e.cout_horaire), 
+        role: e.role || 'employe', 
+        pin: e.pin || '0000' 
+      })));
+      const fetchedCategories = (catRes.data || []).map(c => ({ id: c.id, nom: c.nom, pourcentage: Number(c.pourcentage), isBureau: c.is_bureau }));
+      setHourCategories(fetchedCategories);
+
+      setChantiers((chRes.data || []).map(c => ({
+        id: c.id,
+        nom: c.nom,
+        description: c.description || undefined,
+        devis: c.devis !== undefined && c.devis !== null ? Number(c.devis) : 0,
+        heuresPrevues: c.heures_prevues !== undefined && c.heures_prevues !== null ? Number(c.heures_prevues) : 0,
+      })));
+      setTimeEntries((teRes.data || []).map(e => ({ id: e.id, employeeId: e.employee_id, chantierId: e.chantier_id || undefined, date: e.date, heures: Number(e.heures), description: e.description || undefined, hourCategoryId: e.hour_category_id || undefined })));
+      setMaterialCosts((mcRes.data || []).map(c => ({ id: c.id, chantierId: c.chantier_id, date: c.date, montant: Number(c.montant), description: c.description })));
+    } catch (error) {
+      showError('Erreur de chargement', 'Impossible de charger les données de l’application.', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [showError]);
 
   // Load all data on mount
   useEffect(() => {
@@ -60,8 +77,13 @@ export function useEmployeeStore() {
     const id = Date.now().toString();
     const newEmp: Employee = { ...employee, id };
     setEmployees(prev => [...prev, newEmp]);
-    await supabase.from('employees').insert({ id, nom: employee.nom, prenom: employee.prenom, cout_horaire: employee.coutHoraire, role: employee.role, pin: employee.pin });
-  }, []);
+
+    const { error } = await supabase.from('employees').insert({ id, nom: employee.nom, prenom: employee.prenom, cout_horaire: employee.coutHoraire, role: employee.role, pin: employee.pin });
+    if (error) {
+      setEmployees(prev => prev.filter(emp => emp.id !== id));
+      showError('Erreur', 'Impossible d’ajouter l’employé.', error);
+    }
+  }, [showError]);
 
   const setCurrentEmployee = useCallback((id: string | null) => {
     setCurrentEmployeeId(id);
@@ -82,39 +104,78 @@ export function useEmployeeStore() {
   }, []);
 
   const updateEmployee = useCallback(async (id: string, updates: Partial<Employee>) => {
-    setEmployees(prev => prev.map(emp => emp.id === id ? { ...emp, ...updates } : emp));
+    let previousEmployees: Employee[] = [];
+    setEmployees(prev => {
+      previousEmployees = prev;
+      return prev.map(emp => emp.id === id ? { ...emp, ...updates } : emp);
+    });
+
     const dbUpdates: Record<string, unknown> = {};
     if (updates.nom !== undefined) dbUpdates.nom = updates.nom;
     if (updates.prenom !== undefined) dbUpdates.prenom = updates.prenom;
     if (updates.coutHoraire !== undefined) dbUpdates.cout_horaire = updates.coutHoraire;
     if (updates.role !== undefined) dbUpdates.role = updates.role;
     if (updates.pin !== undefined) dbUpdates.pin = updates.pin;
-    await supabase.from('employees').update(dbUpdates).eq('id', id);
-  }, []);
+
+    const { error } = await supabase.from('employees').update(dbUpdates).eq('id', id);
+    if (error) {
+      setEmployees(previousEmployees);
+      showError('Erreur', 'Impossible de mettre à jour l’employé.', error);
+    }
+  }, [showError]);
 
   const deleteEmployee = useCallback(async (id: string) => {
-    setEmployees(prev => prev.filter(emp => emp.id !== id));
-    setTimeEntries(prev => prev.filter(entry => entry.employeeId !== id));
-    setMaterialCosts(prev => prev.filter(cost => cost.chantierId !== id));
+    let previousEmployees: Employee[] = [];
+    let previousTimeEntries: TimeEntry[] = [];
+    let previousMaterialCosts: MaterialCost[] = [];
+    setEmployees(prev => {
+      previousEmployees = prev;
+      return prev.filter(emp => emp.id !== id);
+    });
+    setTimeEntries(prev => {
+      previousTimeEntries = prev;
+      return prev.filter(entry => entry.employeeId !== id);
+    });
+    setMaterialCosts(prev => {
+      previousMaterialCosts = prev;
+      return prev.filter(cost => cost.chantierId !== id);
+    });
     if (currentEmployeeId === id) {
       setCurrentEmployee(null);
     }
-    await supabase.from('employees').delete().eq('id', id);
-  }, [currentEmployeeId, setCurrentEmployee]);
+
+    const { error } = await supabase.from('employees').delete().eq('id', id);
+    if (error) {
+      setEmployees(previousEmployees);
+      setTimeEntries(previousTimeEntries);
+      setMaterialCosts(previousMaterialCosts);
+      showError('Erreur', 'Impossible de supprimer l’employé.', error);
+    }
+  }, [currentEmployeeId, setCurrentEmployee, showError]);
 
   const addTimeEntry = useCallback(async (entry: Omit<TimeEntry, 'id'>) => {
     const id = Date.now().toString();
     const newEntry: TimeEntry = { ...entry, id };
     setTimeEntries(prev => [...prev, newEntry]);
-    await supabase.from('time_entries').insert({
+
+    const { error } = await supabase.from('time_entries').insert({
       id, employee_id: entry.employeeId, chantier_id: entry.chantierId || null,
       date: entry.date, heures: entry.heures, description: entry.description || null,
       hour_category_id: entry.hourCategoryId || null,
     });
-  }, []);
+    if (error) {
+      setTimeEntries(prev => prev.filter(entry => entry.id !== id));
+      showError('Erreur', 'Impossible d’ajouter la saisie horaire.', error);
+    }
+  }, [showError]);
 
   const updateTimeEntry = useCallback(async (id: string, updates: Partial<TimeEntry>) => {
-    setTimeEntries(prev => prev.map(entry => entry.id === id ? { ...entry, ...updates } : entry));
+    let previousTimeEntries: TimeEntry[] = [];
+    setTimeEntries(prev => {
+      previousTimeEntries = prev;
+      return prev.map(entry => entry.id === id ? { ...entry, ...updates } : entry);
+    });
+
     const dbUpdates: Record<string, unknown> = {};
     if (updates.employeeId !== undefined) dbUpdates.employee_id = updates.employeeId;
     if (updates.chantierId !== undefined) dbUpdates.chantier_id = updates.chantierId || null;
@@ -122,74 +183,148 @@ export function useEmployeeStore() {
     if (updates.heures !== undefined) dbUpdates.heures = updates.heures;
     if (updates.description !== undefined) dbUpdates.description = updates.description || null;
     if (updates.hourCategoryId !== undefined) dbUpdates.hour_category_id = updates.hourCategoryId || null;
-    await supabase.from('time_entries').update(dbUpdates).eq('id', id);
-  }, []);
+
+    const { error } = await supabase.from('time_entries').update(dbUpdates).eq('id', id);
+    if (error) {
+      setTimeEntries(previousTimeEntries);
+      showError('Erreur', 'Impossible de modifier la saisie horaire.', error);
+    }
+  }, [showError]);
 
   const deleteTimeEntry = useCallback(async (id: string) => {
-    setTimeEntries(prev => prev.filter(entry => entry.id !== id));
-    await supabase.from('time_entries').delete().eq('id', id);
-  }, []);
+    let previousTimeEntries: TimeEntry[] = [];
+    setTimeEntries(prev => {
+      previousTimeEntries = prev;
+      return prev.filter(entry => entry.id !== id);
+    });
+
+    const { error } = await supabase.from('time_entries').delete().eq('id', id);
+    if (error) {
+      setTimeEntries(previousTimeEntries);
+      showError('Erreur', 'Impossible de supprimer la saisie horaire.', error);
+    }
+  }, [showError]);
 
   const addChantier = useCallback(async (chantier: Omit<Chantier, 'id'> & { id?: string }) => {
     const id = chantier.id || `ch${Date.now()}`;
     const { id: _id, ...chantierData } = chantier; // Extraire l'ID s'il existe
     const newCh: Chantier = { ...chantierData, id };
     setChantiers(prev => [...prev, newCh]);
-    await supabase.from('chantiers').insert({
+
+    const { error } = await supabase.from('chantiers').insert({
       id,
       nom: chantier.nom,
       description: chantier.description || null,
       devis: chantier.devis ?? 0,
       heures_prevues: chantier.heuresPrevues ?? 0,
     });
-  }, []);
+    if (error) {
+      setChantiers(prev => prev.filter(ch => ch.id !== id));
+      showError('Erreur', 'Impossible d’ajouter le chantier.', error);
+    }
+  }, [showError]);
 
   const deleteChantier = useCallback(async (id: string) => {
-    setChantiers(prev => prev.filter(ch => ch.id !== id));
-    setTimeEntries(prev => prev.filter(entry => entry.chantierId !== id));
-    setMaterialCosts(prev => prev.filter(cost => cost.chantierId !== id));
-    await supabase.from('chantiers').delete().eq('id', id);
-  }, []);
+    let previousChantiers: Chantier[] = [];
+    let previousTimeEntries: TimeEntry[] = [];
+    let previousMaterialCosts: MaterialCost[] = [];
+    setChantiers(prev => {
+      previousChantiers = prev;
+      return prev.filter(ch => ch.id !== id);
+    });
+    setTimeEntries(prev => {
+      previousTimeEntries = prev;
+      return prev.filter(entry => entry.chantierId !== id);
+    });
+    setMaterialCosts(prev => {
+      previousMaterialCosts = prev;
+      return prev.filter(cost => cost.chantierId !== id);
+    });
+
+    const { error } = await supabase.from('chantiers').delete().eq('id', id);
+    if (error) {
+      setChantiers(previousChantiers);
+      setTimeEntries(previousTimeEntries);
+      setMaterialCosts(previousMaterialCosts);
+      showError('Erreur', 'Impossible de supprimer le chantier.', error);
+    }
+  }, [showError]);
 
   const updateChantier = useCallback(async (id: string, updates: Partial<Chantier>) => {
-    setChantiers(prev => prev.map(ch => ch.id === id ? { ...ch, ...updates } : ch));
+    let previousChantiers: Chantier[] = [];
+    setChantiers(prev => {
+      previousChantiers = prev;
+      return prev.map(ch => ch.id === id ? { ...ch, ...updates } : ch);
+    });
     const dbUpdates: Record<string, unknown> = {};
     if (updates.nom !== undefined) dbUpdates.nom = updates.nom;
     if (updates.description !== undefined) dbUpdates.description = updates.description || null;
     if (updates.devis !== undefined) dbUpdates.devis = updates.devis;
     if (updates.heuresPrevues !== undefined) dbUpdates.heures_prevues = updates.heuresPrevues;
     if (Object.keys(dbUpdates).length > 0) {
-      await supabase.from('chantiers').update(dbUpdates).eq('id', id);
+      const { error } = await supabase.from('chantiers').update(dbUpdates).eq('id', id);
+      if (error) {
+        setChantiers(previousChantiers);
+        showError('Erreur', 'Impossible de mettre à jour le chantier.', error);
+      }
     }
-  }, []);
+  }, [showError]);
 
   const addMaterialCost = useCallback(async (cost: Omit<MaterialCost, 'id'>) => {
     const id = `mc${Date.now()}`;
     const newCost: MaterialCost = { ...cost, id };
     setMaterialCosts(prev => [...prev, newCost]);
-    await supabase.from('material_costs').insert({ id, chantier_id: cost.chantierId, date: cost.date, montant: cost.montant, description: cost.description });
-  }, []);
+
+    const { error } = await supabase.from('material_costs').insert({ id, chantier_id: cost.chantierId, date: cost.date, montant: cost.montant, description: cost.description });
+    if (error) {
+      setMaterialCosts(prev => prev.filter(c => c.id !== id));
+      showError('Erreur', 'Impossible d’ajouter le coût matériel.', error);
+    }
+  }, [showError]);
 
   const deleteMaterialCost = useCallback(async (id: string) => {
-    setMaterialCosts(prev => prev.filter(cost => cost.id !== id));
-    await supabase.from('material_costs').delete().eq('id', id);
-  }, []);
+    let previousMaterialCosts: MaterialCost[] = [];
+    setMaterialCosts(prev => {
+      previousMaterialCosts = prev;
+      return prev.filter(cost => cost.id !== id);
+    });
+
+    const { error } = await supabase.from('material_costs').delete().eq('id', id);
+    if (error) {
+      setMaterialCosts(previousMaterialCosts);
+      showError('Erreur', 'Impossible de supprimer le coût matériel.', error);
+    }
+  }, [showError]);
 
   const addHourCategory = useCallback(async (cat: Omit<HourCategory, 'id'>) => {
     const id = `hc${Date.now()}`;
     const newCat: HourCategory = { ...cat, id };
     setHourCategories(prev => [...prev, newCat]);
-    await supabase.from('hour_categories').insert({ id, nom: cat.nom, pourcentage: cat.pourcentage, is_bureau: cat.isBureau || false });
-  }, []);
+
+    const { error } = await supabase.from('hour_categories').insert({ id, nom: cat.nom, pourcentage: cat.pourcentage, is_bureau: cat.isBureau || false });
+    if (error) {
+      setHourCategories(prev => prev.filter(c => c.id !== id));
+      showError('Erreur', 'Impossible d’ajouter la catégorie d’heures.', error);
+    }
+  }, [showError]);
 
   const updateHourCategory = useCallback(async (id: string, updates: Partial<HourCategory>) => {
-    setHourCategories(prev => prev.map(cat => cat.id === id ? { ...cat, ...updates } : cat));
+    let previousCategories: HourCategory[] = [];
+    setHourCategories(prev => {
+      previousCategories = prev;
+      return prev.map(cat => cat.id === id ? { ...cat, ...updates } : cat);
+    });
     const dbUpdates: Record<string, unknown> = {};
     if (updates.nom !== undefined) dbUpdates.nom = updates.nom;
     if (updates.pourcentage !== undefined) dbUpdates.pourcentage = updates.pourcentage;
     if (updates.isBureau !== undefined) dbUpdates.is_bureau = updates.isBureau;
-    await supabase.from('hour_categories').update(dbUpdates).eq('id', id);
-  }, []);
+
+    const { error } = await supabase.from('hour_categories').update(dbUpdates).eq('id', id);
+    if (error) {
+      setHourCategories(previousCategories);
+      showError('Erreur', 'Impossible de mettre à jour la catégorie d’heures.', error);
+    }
+  }, [showError]);
 
   const deleteHourCategory = useCallback(async (id: string) => {
     try {
@@ -220,51 +355,61 @@ export function useEmployeeStore() {
     materialCosts: MaterialCost[];
     hourCategories: HourCategory[];
   }) => {
-    // Clear all tables then insert
-    await Promise.all([
-      supabase.from('time_entries').delete().neq('id', ''),
-      supabase.from('material_costs').delete().neq('id', ''),
-    ]);
-    await Promise.all([
-      supabase.from('employees').delete().neq('id', ''),
-      supabase.from('chantiers').delete().neq('id', ''),
-      supabase.from('hour_categories').delete().neq('id', ''),
-    ]);
+    try {
+      // Clear all tables then insert
+      await Promise.all([
+        supabase.from('time_entries').delete().neq('id', ''),
+        supabase.from('material_costs').delete().neq('id', ''),
+      ]);
+      await Promise.all([
+        supabase.from('employees').delete().neq('id', ''),
+        supabase.from('chantiers').delete().neq('id', ''),
+        supabase.from('hour_categories').delete().neq('id', ''),
+      ]);
 
-    // Insert new data
-    if (data.employees.length > 0) {
-      await supabase.from('employees').insert(data.employees.map(e => ({ id: e.id, nom: e.nom, prenom: e.prenom, cout_horaire: e.coutHoraire })));
-    }
-    if (data.hourCategories.length > 0) {
-      await supabase.from('hour_categories').insert(data.hourCategories.map(c => ({ id: c.id, nom: c.nom, pourcentage: c.pourcentage, is_bureau: c.isBureau || false })));
-    }
-    if (data.chantiers.length > 0) {
-      await supabase.from('chantiers').insert(data.chantiers.map(c => ({
-        id: c.id,
-        nom: c.nom,
-        description: c.description || null,
-        devis: c.devis ?? 0,
-        heures_prevues: c.heuresPrevues ?? 0,
-      })));
-    }
-    if (data.timeEntries.length > 0) {
-      await supabase.from('time_entries').insert(data.timeEntries.map(e => ({ id: e.id, employee_id: e.employeeId, chantier_id: e.chantierId || null, date: e.date, heures: e.heures, description: e.description || null, hour_category_id: e.hourCategoryId || null })));
-    }
-    if (data.materialCosts.length > 0) {
-      await supabase.from('material_costs').insert(data.materialCosts.map(c => ({ id: c.id, chantier_id: c.chantierId, date: c.date, montant: c.montant, description: c.description })));
-    }
+      // Insert new data
+      if (data.employees.length > 0) {
+        const { error } = await supabase.from('employees').insert(data.employees.map(e => ({ id: e.id, nom: e.nom, prenom: e.prenom, cout_horaire: e.coutHoraire, role: e.role, pin: e.pin })));
+        if (error) throw error;
+      }
+      if (data.hourCategories.length > 0) {
+        const { error } = await supabase.from('hour_categories').insert(data.hourCategories.map(c => ({ id: c.id, nom: c.nom, pourcentage: c.pourcentage, is_bureau: c.isBureau || false })));
+        if (error) throw error;
+      }
+      if (data.chantiers.length > 0) {
+        const { error } = await supabase.from('chantiers').insert(data.chantiers.map(c => ({
+          id: c.id,
+          nom: c.nom,
+          description: c.description || null,
+          devis: c.devis ?? 0,
+          heures_prevues: c.heuresPrevues ?? 0,
+        })));
+        if (error) throw error;
+      }
+      if (data.timeEntries.length > 0) {
+        const { error } = await supabase.from('time_entries').insert(data.timeEntries.map(e => ({ id: e.id, employee_id: e.employeeId, chantier_id: e.chantierId || null, date: e.date, heures: e.heures, description: e.description || null, hour_category_id: e.hourCategoryId || null })));
+        if (error) throw error;
+      }
+      if (data.materialCosts.length > 0) {
+        const { error } = await supabase.from('material_costs').insert(data.materialCosts.map(c => ({ id: c.id, chantier_id: c.chantierId, date: c.date, montant: c.montant, description: c.description })));
+        if (error) throw error;
+      }
 
-    setEmployees(data.employees);
-    setTimeEntries(data.timeEntries);
-    setChantiers(data.chantiers);
-    setMaterialCosts(data.materialCosts);
-    setHourCategories(data.hourCategories);
+      setEmployees(data.employees);
+      setTimeEntries(data.timeEntries);
+      setChantiers(data.chantiers);
+      setMaterialCosts(data.materialCosts);
+      setHourCategories(data.hourCategories);
 
-    // Reset current employee if it no longer exists
-    if (currentEmployeeId && !data.employees.some((e) => e.id === currentEmployeeId)) {
-      setCurrentEmployee(null);
+      // Reset current employee if it no longer exists
+      if (currentEmployeeId && !data.employees.some((e) => e.id === currentEmployeeId)) {
+        setCurrentEmployee(null);
+      }
+    } catch (error) {
+      showError('Erreur de restauration', 'Impossible de restaurer les données depuis le fichier.', error);
+      await loadAllData();
     }
-  }, [currentEmployeeId, setCurrentEmployee]);
+  }, [currentEmployeeId, setCurrentEmployee, loadAllData, showError]);
 
   const getHourCategoryById = useCallback(
     (id: string) => hourCategories.find(cat => cat.id === id),

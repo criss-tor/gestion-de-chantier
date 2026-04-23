@@ -3,6 +3,7 @@ import { useEmployeeContext } from '@/contexts/EmployeeContext';
 import { formatHoursDecimalWithH } from '@/lib/utils';
 import { AddChantierDialog } from '@/components/AddChantierDialog';
 import { AddMaterialCostDialog } from '@/components/AddMaterialCostDialog';
+import { PDFExportDialog } from '@/components/PDFExportDialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -30,6 +31,10 @@ export default function Chantiers() {
   const {
     chantiers,
     chantierStats,
+    materialCosts,
+    timeEntries,
+    employees,
+    hourCategories,
     addChantier,
     deleteChantier,
     addMaterialCost,
@@ -39,6 +44,7 @@ export default function Chantiers() {
   const [showAddMaterial, setShowAddMaterial] = useState(false);
   const [deletingChantier, setDeletingChantier] = useState<string | null>(null);
   const [selectedChantier, setSelectedChantier] = useState<string | null>(null);
+  const [showExportDialog, setShowExportDialog] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const formatCurrency = (amount: number) => {
@@ -73,7 +79,7 @@ export default function Chantiers() {
           <p className="text-muted-foreground">Suivi des coûts par chantier</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" disabled>
+          <Button variant="outline" onClick={() => setShowExportDialog(true)}>
             <TrendingUp className="mr-2 h-4 w-4" />
             Exporter bilan (PDF)
           </Button>
@@ -142,6 +148,7 @@ export default function Chantiers() {
                   <TableHead className="text-right">Main-d'œuvre</TableHead>
                   <TableHead className="text-right">Matériel</TableHead>
                   <TableHead className="text-right">Total</TableHead>
+                  <TableHead className="text-right">Facturable (+25%)</TableHead>
                   <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -188,6 +195,9 @@ export default function Chantiers() {
                       <TableCell className="text-right">{formatCurrency(stat.coutMateriel)}</TableCell>
                       <TableCell className="text-right font-semibold text-primary">
                         {formatCurrency(stat.coutTotal)}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold text-blue-600">
+                        {formatCurrency(stat.coutTotal * 1.25)}
                       </TableCell>
                       <TableCell>
                         <Button
@@ -272,6 +282,16 @@ export default function Chantiers() {
             setSelectedChantier(null);
           }
         }}
+      />
+
+      <PDFExportDialog
+        open={showExportDialog}
+        onOpenChange={setShowExportDialog}
+        employees={employees}
+        timeEntries={timeEntries}
+        chantiers={chantiers}
+        hourCategories={hourCategories}
+        materialCosts={materialCosts}
       />
     </div>
   );

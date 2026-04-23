@@ -11,7 +11,7 @@ interface PendingAction {
   id: string;
   type: 'add' | 'update' | 'delete';
   table: 'time_entries' | 'material_costs';
-  data: any;
+  data: unknown;
   timestamp: string;
 }
 

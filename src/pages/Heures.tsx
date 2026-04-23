@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useEmployeeContext } from '@/contexts/EmployeeContext';
-import { HourCategory } from '@/types/employee';
+import { HourCategory, TimeEntry } from '@/types/employee';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -66,7 +66,7 @@ export default function Heures() {
   const [entryHeures, setEntryHeures] = useState('0');
   const [entryMinutes, setEntryMinutes] = useState('0');
   const [entryDescription, setEntryDescription] = useState('');
-  const [editingEntry, setEditingEntry] = useState<any>(null);
+  const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -169,7 +169,7 @@ export default function Heures() {
     }
   };
 
-  const handleEditEntry = (entry: any) => {
+  const handleEditEntry = (entry: TimeEntry) => {
     setEditingEntry(entry);
     setSelectedEmployeeId(entry.employeeId);
     setSelectedChantierId(entry.chantierId || '');
@@ -262,7 +262,7 @@ export default function Heures() {
   };
 
   return (
-    <div className={`space-y-6 ${isMobile ? 'max-w-sm mx-auto' : ''}`}>
+    <div className={`space-y-6 ${isMobile ? 'max-w-full mx-auto px-3 overflow-x-hidden' : 'max-w-6xl mx-auto'}`}>
       <div className={`flex items-center ${isMobile ? 'flex-col gap-3' : 'justify-between'}`}>
         <div>
           <h1 className={`font-bold ${isMobile ? 'text-xl' : 'text-2xl'}`}>Saisie des heures</h1>
@@ -358,33 +358,27 @@ export default function Heures() {
                 />
                 <span className="flex items-center text-lg font-medium">min</span>
                 <div className="flex gap-1">
-                  <Button 
+                  <button 
                     type="button" 
-                    variant="outline" 
-                    size="sm" 
                     onClick={() => setEntryMinutes('15')}
-                    className={`${isMobile ? 'h-8 px-2 text-xs' : 'px-2 py-1 text-xs'}`}
+                    className={`border rounded bg-background hover:bg-muted ${isMobile ? 'h-8 px-2 text-xs' : 'px-2 py-1 text-xs'} transition-colors`}
                   >
                     15
-                  </Button>
-                  <Button 
+                  </button>
+                  <button 
                     type="button" 
-                    variant="outline" 
-                    size="sm" 
                     onClick={() => setEntryMinutes('30')}
-                    className={`${isMobile ? 'h-8 px-2 text-xs' : 'px-2 py-1 text-xs'}`}
+                    className={`border rounded bg-background hover:bg-muted ${isMobile ? 'h-8 px-2 text-xs' : 'px-2 py-1 text-xs'} transition-colors`}
                   >
                     30
-                  </Button>
-                  <Button 
+                  </button>
+                  <button 
                     type="button" 
-                    variant="outline" 
-                    size="sm" 
                     onClick={() => setEntryMinutes('45')}
-                    className={`${isMobile ? 'h-8 px-2 text-xs' : 'px-2 py-1 text-xs'}`}
+                    className={`border rounded bg-background hover:bg-muted ${isMobile ? 'h-8 px-2 text-xs' : 'px-2 py-1 text-xs'} transition-colors`}
                   >
                     45
-                  </Button>
+                  </button>
                 </div>
               </div>
             </div>
@@ -440,7 +434,7 @@ export default function Heures() {
 
       {/* Statistiques et liste des entrées */}
       {currentEmployeeId && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'md:grid-cols-2'}`}>
           <Card>
             <CardHeader>
               <CardTitle className={isMobile ? 'text-lg' : ''}>Résumé hebdomadaire</CardTitle>
@@ -502,17 +496,17 @@ export default function Heures() {
             </p>
           ) : (
             <>
-              <div className="overflow-x-auto">
-                <Table>
+              <div className={`${isMobile ? 'overflow-x-auto -mx-3 px-3' : ''}`}>
+                <Table className={isMobile ? 'min-w-[480px]' : ''}>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Employé</TableHead>
-                      <TableHead>Chantier</TableHead>
-                      <TableHead>Catégorie</TableHead>
-                      <TableHead>Heures</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead>Actions</TableHead>
+                      <TableHead className={`${isMobile ? 'min-w-[55px] px-0.5' : ''}`}>Date</TableHead>
+                      <TableHead className={`${isMobile ? 'min-w-[65px] px-0.5' : ''}`}>Employé</TableHead>
+                      <TableHead className={`${isMobile ? 'min-w-[65px] px-0.5' : ''}`}>Chantier</TableHead>
+                      <TableHead className={`${isMobile ? 'min-w-[55px] px-0.5' : ''}`}>Cat.</TableHead>
+                      <TableHead className={`${isMobile ? 'min-w-[40px] px-0.5' : ''}`}>H</TableHead>
+                      <TableHead className={`${isMobile ? 'min-w-[75px] px-0.5' : ''}`}>Note</TableHead>
+                      <TableHead className={`${isMobile ? 'min-w-[55px] px-0.5' : ''}`}>Act.</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -522,25 +516,25 @@ export default function Heures() {
                       const cat = entry.hourCategoryId ? hourCategories.find((c) => c.id === entry.hourCategoryId) : null;
                       return (
                         <TableRow key={entry.id}>
-                          <TableCell>{format(parseISO(entry.date), 'dd/MM/yyyy')}</TableCell>
-                          <TableCell>{emp?.prenom} {emp?.nom}</TableCell>
-                          <TableCell>{ch?.nom || 'Bureau'}</TableCell>
-                          <TableCell>
+                          <TableCell className={`${isMobile ? 'px-0.5 py-1' : ''}`}>{format(parseISO(entry.date), 'dd/MM', { locale: fr })}</TableCell>
+                          <TableCell className={`${isMobile ? 'px-0.5 py-1' : ''}`}>{emp?.prenom}</TableCell>
+                          <TableCell className={`${isMobile ? 'px-0.5 py-1' : ''}`}>{ch?.nom || 'Bureau'}</TableCell>
+                          <TableCell className={`${isMobile ? 'px-0.5 py-1' : ''}`}>
                             {cat && (
-                              <Badge variant={cat.isBureau ? 'secondary' : 'default'}>
-                                {cat.nom}
+                              <Badge variant={cat.isBureau ? 'secondary' : 'default'} className={isMobile ? 'px-1 py-0' : ''}>
+                                {cat.nom.slice(0, 6)}
                               </Badge>
                             )}
                           </TableCell>
-                          <TableCell>{formatHoursDecimalWithH(entry.heures)}</TableCell>
-                          <TableCell className="max-w-xs truncate">{entry.description || '-'}</TableCell>
-                          <TableCell>
-                            <div className="flex gap-1">
-                              <Button variant="ghost" size="icon" onClick={() => handleEditEntry(entry)}>
-                                <Edit className="h-4 w-4" />
+                          <TableCell className={`${isMobile ? 'px-0.5 py-1' : ''}`}>{formatHoursDecimalWithH(entry.heures)}</TableCell>
+                          <TableCell className={`${isMobile ? 'max-w-[75px] px-0.5 py-1' : 'max-w-xs truncate'}`}>{entry.description || '-'}</TableCell>
+                          <TableCell className={`${isMobile ? 'px-0.5 py-1' : ''}`}>
+                            <div className="flex gap-0">
+                              <Button variant="ghost" size="icon" className={isMobile ? 'h-6 w-6 p-0' : ''} onClick={() => handleEditEntry(entry)}>
+                                <Edit className="h-3 w-3" />
                               </Button>
-                              <Button variant="ghost" size="icon" onClick={() => handleDeleteEntry(entry.id)}>
-                                <Trash2 className="h-4 w-4" />
+                              <Button variant="ghost" size="icon" className={isMobile ? 'h-6 w-6 p-0' : ''} onClick={() => handleDeleteEntry(entry.id)}>
+                                <Trash2 className="h-3 w-3" />
                               </Button>
                             </div>
                           </TableCell>

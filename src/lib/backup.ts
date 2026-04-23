@@ -97,8 +97,8 @@ export function importBackup(fileBuffer: ArrayBuffer): BackupData {
   // Employees
   const empSheet = wb.Sheets['Employés'];
   if (empSheet) {
-    const rows = XLSX.utils.sheet_to_json<any>(empSheet);
-    data.employees = rows.map(r => ({
+    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(empSheet);
+    data.employees = rows.map((r: Record<string, unknown>) => ({
       id: String(r['ID'] ?? ''), nom: String(r['Nom'] ?? ''), prenom: String(r['Prénom'] ?? ''),
       coutHoraire: Number(r['Coût Horaire (€)'] ?? 0),
       role: String(r['Rôle'] ?? 'employe'),
@@ -109,8 +109,8 @@ export function importBackup(fileBuffer: ArrayBuffer): BackupData {
   // Hour Categories
   const catSheet = wb.Sheets['Catégories'];
   if (catSheet) {
-    const rows = XLSX.utils.sheet_to_json<any>(catSheet);
-    data.hourCategories = rows.map(r => ({
+    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(catSheet);
+    data.hourCategories = rows.map((r: Record<string, unknown>) => ({
       id: String(r['ID'] ?? ''), nom: String(r['Nom'] ?? ''),
       pourcentage: Number(r['Pourcentage (%)'] ?? 0),
       isBureau: r['Bureau'] === 'Oui'
@@ -120,8 +120,8 @@ export function importBackup(fileBuffer: ArrayBuffer): BackupData {
   // Chantiers
   const chSheet = wb.Sheets['Chantiers'];
   if (chSheet) {
-    const rows = XLSX.utils.sheet_to_json<any>(chSheet);
-    data.chantiers = rows.map(r => ({
+    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(chSheet);
+    data.chantiers = rows.map((r: Record<string, unknown>) => ({
       id: String(r['ID'] ?? ''),
       nom: String(r['Nom'] ?? ''),
       description: r['Description'] ? String(r['Description']) : undefined,
@@ -133,8 +133,8 @@ export function importBackup(fileBuffer: ArrayBuffer): BackupData {
   // Time Entries
   const teSheet = wb.Sheets['Heures'];
   if (teSheet) {
-    const rows = XLSX.utils.sheet_to_json<any>(teSheet);
-    data.timeEntries = rows.map(r => ({
+    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(teSheet);
+    data.timeEntries = rows.map((r: Record<string, unknown>) => ({
       id: String(r['ID'] ?? ''), employeeId: String(r['ID Employé'] ?? ''),
       chantierId: r['ID Chantier'] ? String(r['ID Chantier']) : undefined,
       date: String(r['Date'] ?? ''), heures: Number(r['Heures'] ?? 0),
@@ -146,8 +146,8 @@ export function importBackup(fileBuffer: ArrayBuffer): BackupData {
   // Material Costs
   const mcSheet = wb.Sheets['Matériaux'];
   if (mcSheet) {
-    const rows = XLSX.utils.sheet_to_json<any>(mcSheet);
-    data.materialCosts = rows.map(r => ({
+    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(mcSheet);
+    data.materialCosts = rows.map((r: Record<string, unknown>) => ({
       id: String(r['ID'] ?? ''), chantierId: String(r['ID Chantier'] ?? ''),
       date: String(r['Date'] ?? ''), montant: Number(r['Montant (€)'] ?? 0),
       description: String(r['Description'] ?? '')

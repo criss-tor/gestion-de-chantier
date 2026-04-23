@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { FileText, Download, Calendar, Users, Building2, FileSpreadsheet } from 'lucide-react';
-import { Employee, TimeEntry, Chantier, HourCategory } from '@/types/employee';
+import { Employee, TimeEntry, Chantier, HourCategory, MaterialCost } from '@/types/employee';
 import { pdfExportService } from '@/lib/pdfExport';
 import { format, subMonths } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -29,6 +29,7 @@ interface PDFExportDialogProps {
   timeEntries: TimeEntry[];
   chantiers: Chantier[];
   hourCategories: HourCategory[];
+  materialCosts: MaterialCost[];
 }
 
 export function PDFExportDialog({
@@ -37,7 +38,8 @@ export function PDFExportDialog({
   employees,
   timeEntries,
   chantiers,
-  hourCategories
+  hourCategories,
+  materialCosts
 }: PDFExportDialogProps) {
   const [exportType, setExportType] = useState<'employee' | 'chantier' | 'global'>('employee');
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
@@ -64,7 +66,7 @@ export function PDFExportDialog({
     
     try {
       switch (exportType) {
-        case 'employee':
+        case 'employee': {
           if (!selectedEmployeeId) {
             alert('Veuillez sélectionner un employé');
             return;
@@ -80,8 +82,9 @@ export function PDFExportDialog({
             );
           }
           break;
+        }
           
-        case 'chantier':
+        case 'chantier': {
           if (!selectedChantierId) {
             alert('Veuillez sélectionner un chantier');
             return;
@@ -92,19 +95,23 @@ export function PDFExportDialog({
               chantier,
               timeEntries,
               employees,
-              hourCategories
+              hourCategories,
+              materialCosts
             );
           }
           break;
-          
-        case 'global':
+        }
+        case 'global': {
+          const getHourCategoryById = (id: string) => hourCategories.find(cat => cat.id === id);
           await pdfExportService.exportGlobalSummary(
             employees,
             timeEntries,
             chantiers,
-            selectedMonth
+            selectedMonth,
+            getHourCategoryById
           );
           break;
+        }
       }
       
       onOpenChange(false);
@@ -147,7 +154,7 @@ export function PDFExportDialog({
           {/* Type d'export */}
           <div className="space-y-2">
             <Label>Type de rapport</Label>
-            <Select value={exportType} onValueChange={(value: any) => setExportType(value)}>
+            <Select value={exportType} onValueChange={(value: 'employee' | 'chantier' | 'global') => setExportType(value)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>

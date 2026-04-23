@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useEmployeeContext } from '@/contexts/EmployeeContext';
 import { formatHoursDecimalWithH } from '@/lib/utils';
+import { MaterialCost } from '@/types/employee';
 import {
   Dialog,
   DialogContent,
@@ -27,7 +28,7 @@ interface ChantierDetailDialogProps {
 }
 
 export function ChantierDetailDialog({ chantierId, open, onOpenChange }: ChantierDetailDialogProps) {
-  const { employees, timeEntries, materialCosts, getChantierById, getEntryCost, chantierStats, updateChantier, deleteMaterialCost, addMaterialCost } = useEmployeeContext();
+  const { employees, timeEntries, materialCosts, getChantierById, getEntryCost, chantierStats, updateChantier, deleteMaterialCost, addMaterialCost, getHourCategoryById } = useEmployeeContext();
 
   const [devisInput, setDevisInput] = useState('0');
   const [heuresPrevuesInput, setHeuresPrevuesInput] = useState('0');
@@ -50,24 +51,40 @@ export function ChantierDetailDialog({ chantierId, open, onOpenChange }: Chantie
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat('fr-CH', { style: 'currency', currency: 'CHF' }).format(amount);
 
-  // Group hours by employee
+  // Group hours by employee and category
   const chantierEntries = timeEntries.filter((e) => e.chantierId === chantierId);
-  const hoursPerEmployee = new Map<string, { heures: number; cout: number }>();
+  const hoursPerEmployee = new Map<string, { atelier: number; pose: number; total: number; cout: number }>();
   chantierEntries.forEach((entry) => {
     const emp = employees.find((e) => e.id === entry.employeeId);
     const cost = getEntryCost(entry);
-    const existing = hoursPerEmployee.get(entry.employeeId) || { heures: 0, cout: 0 };
-    existing.heures += entry.heures;
+    const category = entry.hourCategoryId ? getHourCategoryById(entry.hourCategoryId) : null;
+    
+    // Determine category type based on category name
+    let categoryType: 'atelier' | 'pose' = 'atelier'; // default
+    if (category) {
+      const categoryName = category.nom.toLowerCase();
+      if (categoryName.includes('pose')) {
+        categoryType = 'pose';
+      } else {
+        categoryType = 'atelier';
+      }
+    }
+    
+    const existing = hoursPerEmployee.get(entry.employeeId) || { atelier: 0, pose: 0, total: 0, cout: 0 };
+    existing[categoryType] += entry.heures;
+    existing.total += entry.heures;
     existing.cout += cost;
     hoursPerEmployee.set(entry.employeeId, existing);
   });
 
   const employeeRows = Array.from(hoursPerEmployee.entries()).map(([empId, data]) => {
     const emp = employees.find((e) => e.id === empId);
-    return { emp, heures: data.heures, cout: data.cout };
+    return { emp, ...data };
   });
 
-  const totalHeures = employeeRows.reduce((s, r) => s + r.heures, 0);
+  const totalHeures = employeeRows.reduce((s, r) => s + r.total, 0);
+  const totalAtelier = employeeRows.reduce((s, r) => s + r.atelier, 0);
+  const totalPose = employeeRows.reduce((s, r) => s + r.pose, 0);
   const totalMain = employeeRows.reduce((s, r) => s + r.cout, 0);
 
   // Bureau stats for this chantier
@@ -101,7 +118,7 @@ export function ChantierDetailDialog({ chantierId, open, onOpenChange }: Chantie
     }
   };
 
-  const handleEditMaterial = (cost: any) => {
+  const handleEditMaterial = (cost: MaterialCost) => {
     setEditingMaterial(cost.id);
     setNewMaterialDescription(cost.description);
     setNewMaterialAmount(String(cost.montant));
@@ -210,7 +227,9 @@ export function ChantierDetailDialog({ chantierId, open, onOpenChange }: Chantie
           <div className="flex items-center gap-2">
             <Users className="h-4 w-4 text-muted-foreground" />
             <h3 className="font-semibold text-sm">Heures par employé</h3>
-            <Badge variant="secondary" className="ml-auto">{totalHeures}h — {formatCurrency(totalMain)}</Badge>
+            <Badge variant="secondary" className="ml-auto">
+              Atelier: {totalAtelier}h • Pose: {totalPose}h • Total: {totalHeures}h — {formatCurrency(totalMain)}
+            </Badge>
           </div>
 
           {/* Les heures de bureau ne sont plus réparties sur les chantiers */}
@@ -221,8 +240,9 @@ export function ChantierDetailDialog({ chantierId, open, onOpenChange }: Chantie
               <TableHeader>
                 <TableRow>
                   <TableHead>Employé</TableHead>
-                  <TableHead>Coût/h</TableHead>
-                  <TableHead className="text-right">Heures</TableHead>
+                  <TableHead className="text-right">Atelier</TableHead>
+                  <TableHead className="text-right">Pose</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
                   <TableHead className="text-right">Coût</TableHead>
                 </TableRow>
               </TableHeader>
@@ -230,8 +250,9 @@ export function ChantierDetailDialog({ chantierId, open, onOpenChange }: Chantie
                 {employeeRows.map((row) => (
                   <TableRow key={row.emp?.id}>
                     <TableCell className="font-medium">{row.emp?.prenom} {row.emp?.nom}</TableCell>
-                    <TableCell>{row.emp ? formatCurrency(row.emp.coutHoraire) : '-'}</TableCell>
-                    <TableCell className="text-right">{row.heures}h</TableCell>
+                    <TableCell className="text-right">{row.atelier}h</TableCell>
+                    <TableCell className="text-right">{row.pose}h</TableCell>
+                    <TableCell className="text-right font-semibold">{row.total}h</TableCell>
                     <TableCell className="text-right">{formatCurrency(row.cout)}</TableCell>
                   </TableRow>
                 ))}
@@ -398,6 +419,14 @@ export function ChantierDetailDialog({ chantierId, open, onOpenChange }: Chantie
             <span className={`text-lg font-bold ${(totalHeures - (chantier.heuresPrevues ?? 0)) > 0 ? 'text-destructive' : 'text-primary'}`}>
               {(totalHeures - (chantier.heuresPrevues ?? 0)).toFixed(1)} h
             </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="font-semibold">Coût main d'œuvre</span>
+            <span className="text-lg font-bold text-primary">{formatCurrency(totalMain)}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="font-semibold">Coût matériel</span>
+            <span className="text-lg font-bold text-primary">{formatCurrency(totalMateriel)}</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="font-semibold">Coût total</span>

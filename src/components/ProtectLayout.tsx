@@ -11,7 +11,13 @@ export function ProtectLayout({ children }: ProtectLayoutProps) {
 
   // Attendre le chargement
   if (loading) {
-    return null;
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="rounded-xl border border-border bg-card px-6 py-5 text-center shadow-sm">
+          <p className="text-sm text-muted-foreground">Chargement de l’application…</p>
+        </div>
+      </div>
+    );
   }
 
   // Si l'utilisateur n'a jamais se connecté, rediriger vers login

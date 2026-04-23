@@ -29,19 +29,21 @@ import {
   TableHeader,
   TableRow } from
 '@/components/ui/table';
-import { ChevronLeft, ChevronRight, Plus, Clock, Trash2, DollarSign, Timer, HardHat, Download } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Clock, Trash2, Edit, Timer, HardHat, Download } from 'lucide-react';
 import { format, startOfWeek, addDays, addWeeks, subWeeks, isSameDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceLine } from 'recharts';
 import { PDFExportDialog } from '@/components/PDFExportDialog';
+import GanttChart from '@/components/GanttChart';
 
 const Dashboard = () => {
   const {
     employees,
     chantiers,
     timeEntries,
+    materialCosts,
     hourCategories,
     addTimeEntry,
+    updateTimeEntry,
     deleteTimeEntry,
     getEmployeeById,
     getChantierById,
@@ -57,7 +59,27 @@ const Dashboard = () => {
   const [selectedHourCategoryId, setSelectedHourCategoryId] = useState('');
   const [heures, setHeures] = useState('8');
   const [description, setDescription] = useState('');
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [showPDFDialog, setShowPDFDialog] = useState(false);
+
+  // State for Gantt markers
+  const [markers, setMarkers] = useState<{ id: string; chantierId: string; date: string; endDate?: string; type: 'milestone' | 'appointment' | 'end-date' | 'custom' | 'range'; label: string }[]>(() => {
+    const stored = localStorage.getItem('gc_ganttMarkers');
+    return stored ? JSON.parse(stored) : [];
+  });
+
+  const handleAddMarker = (marker: Omit<{ id: string; chantierId: string; date: string; endDate?: string; type: 'milestone' | 'appointment' | 'end-date' | 'custom' | 'range'; label: string }, 'id'>) => {
+    const newMarker = { ...marker, id: Date.now().toString() };
+    const updatedMarkers = [...markers, newMarker];
+    setMarkers(updatedMarkers);
+    localStorage.setItem('gc_ganttMarkers', JSON.stringify(updatedMarkers));
+  };
+
+  const handleDeleteMarker = (id: string) => {
+    const updatedMarkers = markers.filter((m) => m.id !== id);
+    setMarkers(updatedMarkers);
+    localStorage.setItem('gc_ganttMarkers', JSON.stringify(updatedMarkers));
+  };
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const weekDays = Array.from({ length: 5 }, (_, i) => addDays(weekStart, i));
@@ -79,27 +101,53 @@ const Dashboard = () => {
     setSelectedHourCategoryId(hourCategories[0]?.id || '');
     setHeures('8');
     setDescription('');
+    setEditingEntryId(null);
   };
 
   const selectedCategory = hourCategories.find((c) => c.id === selectedHourCategoryId);
   const isBureauSelected = selectedCategory?.isBureau === true;
 
-  const handleAddEntry = () => {
-    if (!selectedDay || !selectedEmployeeId || !heures) return;
-    if (!isBureauSelected && !selectedChantierId) return;
-    addTimeEntry({
-      employeeId: selectedEmployeeId,
-      chantierId: isBureauSelected ? undefined : selectedChantierId,
-      date: format(selectedDay, 'yyyy-MM-dd'),
-      heures: parseFloat(heures),
-      description: description || undefined,
-      hourCategoryId: selectedHourCategoryId || undefined
-    });
+  const resetEntryForm = () => {
+    setSelectedDay(null);
     setSelectedChantierId('');
     setSelectedEmployeeId('');
     setSelectedHourCategoryId(hourCategories[0]?.id || '');
     setHeures('8');
     setDescription('');
+    setEditingEntryId(null);
+  };
+
+  const handleEditEntry = (entry: typeof timeEntries[number]) => {
+    setSelectedDay(new Date(entry.date));
+    setSelectedChantierId(entry.chantierId ?? '');
+    setSelectedEmployeeId(entry.employeeId);
+    setSelectedHourCategoryId(entry.hourCategoryId ?? (hourCategories[0]?.id || ''));
+    setHeures(entry.heures.toString());
+    setDescription(entry.description || '');
+    setEditingEntryId(entry.id);
+    setShowAddDialog(true);
+  };
+
+  const handleAddEntry = async () => {
+    if (!selectedDay || !selectedEmployeeId || !heures) return;
+    if (!isBureauSelected && !selectedChantierId) return;
+
+    const entryData = {
+      employeeId: selectedEmployeeId,
+      chantierId: isBureauSelected ? undefined : selectedChantierId,
+      date: format(selectedDay, 'yyyy-MM-dd'),
+      heures: parseFloat(heures),
+      description: description || undefined,
+      hourCategoryId: selectedHourCategoryId || undefined,
+    };
+
+    if (editingEntryId) {
+      await updateTimeEntry(editingEntryId, entryData);
+    } else {
+      await addTimeEntry(entryData);
+    }
+
+    resetEntryForm();
   };
 
   // Preview cost calculation
@@ -130,17 +178,43 @@ const Dashboard = () => {
     // Separate bureau and non-bureau entries
     const directEntries = monthEntries.filter((e) => e.chantierId);
     const bureauEntries = monthEntries.filter((e) => !e.chantierId);
+    const monthMaterials = materialCosts.filter((cost) => cost.date.startsWith(monthStr));
 
-    const map = new Map<string, {nom: string;devis: number;heures: number;cout: number;heuresBureau: number;coutBureau: number;heuresPrevues: number;}>();
+    const map = new Map<string, {nom: string;devis: number;heures: number;coutMain: number;coutMateriel: number;coutTotal: number;heuresBureau: number;coutBureau: number;heuresPrevues: number;}>();
 
     // Count direct hours per chantier
     directEntries.forEach((entry) => {
       const ch = getChantierById(entry.chantierId!);
       if (!ch) return;
-      const existing = map.get(ch.id) || { nom: ch.nom, devis: ch.devis ?? 0, heures: 0, cout: 0, heuresBureau: 0, coutBureau: 0, heuresPrevues: ch.heuresPrevues ?? 0 };
+      const existing = map.get(ch.id) || { nom: ch.nom, devis: ch.devis ?? 0, heures: 0, coutMain: 0, coutMateriel: 0, coutTotal: 0, heuresBureau: 0, coutBureau: 0, heuresPrevues: ch.heuresPrevues ?? 0 };
       existing.heures += entry.heures;
-      existing.cout += getEntryCost(entry);
+      existing.coutMain += getEntryCost(entry);
+      existing.coutTotal = existing.coutMain + existing.coutMateriel;
       map.set(ch.id, existing);
+    });
+
+    // Add material costs per chantier
+    monthMaterials.forEach((cost) => {
+      const existing = map.get(cost.chantierId);
+      if (!existing) {
+        const chantier = getChantierById(cost.chantierId);
+        if (!chantier) return;
+        map.set(cost.chantierId, {
+          nom: chantier.nom,
+          devis: chantier.devis ?? 0,
+          heures: 0,
+          coutMain: 0,
+          coutMateriel: cost.montant,
+          coutTotal: cost.montant,
+          heuresBureau: 0,
+          coutBureau: 0,
+          heuresPrevues: chantier.heuresPrevues ?? 0,
+        });
+        return;
+      }
+      existing.coutMateriel += cost.montant;
+      existing.coutTotal = existing.coutMain + existing.coutMateriel;
+      map.set(cost.chantierId, existing);
     });
 
     // Distribute bureau hours proportionally
@@ -156,7 +230,66 @@ const Dashboard = () => {
     }
 
     return Array.from(map.values()).sort((a, b) => b.heures + b.heuresBureau - (a.heures + a.heuresBureau));
-  }, [timeEntries, currentDate, getChantierById, getEntryCost]);
+  }, [timeEntries, materialCosts, currentDate, getChantierById, getEntryCost]);
+
+  // Calcul des stats chantier pour la TOTALITÉ (tous les temps, pas limité à un mois)
+  const allTimeChantierStats = useMemo(() => {
+    // Utiliser TOUTES les entrées, pas filtrées par mois
+    const allDirectEntries = timeEntries.filter((e) => e.chantierId);
+    const allBureauEntries = timeEntries.filter((e) => !e.chantierId);
+    const allMaterials = materialCosts; // Toutes les dépenses de matériel
+
+    const map = new Map<string, {nom: string;devis: number;heures: number;coutMain: number;coutMateriel: number;coutTotal: number;heuresBureau: number;coutBureau: number;heuresPrevues: number;}>();
+
+    // Count direct hours per chantier
+    allDirectEntries.forEach((entry) => {
+      const ch = getChantierById(entry.chantierId!);
+      if (!ch) return;
+      const existing = map.get(ch.id) || { nom: ch.nom, devis: ch.devis ?? 0, heures: 0, coutMain: 0, coutMateriel: 0, coutTotal: 0, heuresBureau: 0, coutBureau: 0, heuresPrevues: ch.heuresPrevues ?? 0 };
+      existing.heures += entry.heures;
+      existing.coutMain += getEntryCost(entry);
+      existing.coutTotal = existing.coutMain + existing.coutMateriel;
+      map.set(ch.id, existing);
+    });
+
+    // Add material costs per chantier
+    allMaterials.forEach((cost) => {
+      const existing = map.get(cost.chantierId);
+      if (!existing) {
+        const chantier = getChantierById(cost.chantierId);
+        if (!chantier) return;
+        map.set(cost.chantierId, {
+          nom: chantier.nom,
+          devis: chantier.devis ?? 0,
+          heures: 0,
+          coutMain: 0,
+          coutMateriel: cost.montant,
+          coutTotal: cost.montant,
+          heuresBureau: 0,
+          coutBureau: 0,
+          heuresPrevues: chantier.heuresPrevues ?? 0,
+        });
+        return;
+      }
+      existing.coutMateriel += cost.montant;
+      existing.coutTotal = existing.coutMain + existing.coutMateriel;
+      map.set(cost.chantierId, existing);
+    });
+
+    // Distribute bureau hours proportionally
+    const totalDirectHours = allDirectEntries.reduce((s, e) => s + e.heures, 0);
+    if (totalDirectHours > 0 && allBureauEntries.length > 0) {
+      const totalBureauHours = allBureauEntries.reduce((s, e) => s + e.heures, 0);
+      const totalBureauCost = allBureauEntries.reduce((s, e) => s + getEntryCost(e), 0);
+      map.forEach((stat) => {
+        const ratio = stat.heures / totalDirectHours;
+        stat.heuresBureau = totalBureauHours * ratio;
+        stat.coutBureau = totalBureauCost * ratio;
+      });
+    }
+
+    return Array.from(map.values()).sort((a, b) => b.heures + b.heuresBureau - (a.heures + a.heuresBureau));
+  }, [timeEntries, materialCosts, getChantierById, getEntryCost]);
 
   const formatCurrency = (amount: number) =>
   new Intl.NumberFormat('fr-CH', { style: 'currency', currency: 'CHF' }).format(amount);
@@ -371,99 +504,17 @@ const Dashboard = () => {
         </CardContent>
       </Card>
 
-      {/* Monthly Chantier Breakdown */}
-      <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <HardHat className="h-4 w-4 text-muted-foreground" />
-              <CardTitle className="text-sm font-medium">Répartition par chantier — {format(currentDate, 'MMMM yyyy', { locale: fr })}</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            {monthlyChantierStats.length === 0 ? (
-              <div className="py-12 text-center text-muted-foreground">
-                <div className="text-lg font-medium">Aucune donnée de chantier pour ce mois.</div>
-                <div className="text-sm">Ajoutez des heures dans le calendrier pour voir le graphique.</div>
-              </div>
-            ) : (
-              (() => {
-              // Les heures de bureau sont exclues car ce sont des frais généraux non répartis sur les chantiers
-              const totalAllHours = monthlyChantierStats.reduce((s, c) => s + c.heures, 0);
-              const chartData = monthlyChantierStats.map((s) => {
-                const cost = s.cout;
-                const pctCost = s.devis > 0 ? Math.min(200, (cost / s.devis) * 100) : 0;
-                const reelHeures = s.heures;
-                const pctHeures = s.heuresPrevues > 0 ? Math.min(200, (reelHeures / s.heuresPrevues) * 100) : 0;
-                return {
-                  name: s.nom,
-                  pctCost,
-                  pctHeures,
-                  devis: s.devis,
-                  reelHeures,
-                  heuresPrevues: s.heuresPrevues,
-                };
-              });
-              return (
-                <>
-                  <div className="mb-4">
-                    <ResponsiveContainer width="100%" height={240}>
-                      <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                        <YAxis domain={[0, 120]} tickFormatter={(v) => `${v}%`} />
-                        <Tooltip formatter={(value: number) => `${value.toFixed(0)}%`} />
-                        <Legend verticalAlign="top" height={24} />
-                        <ReferenceLine y={100} stroke="#ef4444" strokeDasharray="3 3" label={{ value: '100%', position: 'right', fill: '#ef4444', fontSize: 10 }} />
-                        <Bar dataKey="pctCost" fill="#2563eb" name="% devis consommé" />
-                        <Bar dataKey="pctHeures" fill="#14b8a6" name="% heures prévues" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="hover:bg-transparent">
-                        <TableHead className="font-semibold">Chantier</TableHead>
-                        <TableHead className="font-semibold text-right">Heures chantier</TableHead>
-                        <TableHead className="font-semibold text-right">Heures prévues</TableHead>
-                        <TableHead className="font-semibold text-right">Écart</TableHead>
-                        <TableHead className="font-semibold min-w-[160px]">% répartition</TableHead>
-                        <TableHead className="font-semibold text-right">Coût main d'œuvre</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {monthlyChantierStats.map((s) => {
-                      // Les heures de bureau sont exclues du calcul car ce sont des frais généraux
-                      const pct = totalAllHours > 0 ? s.heures / totalAllHours * 100 : 0;
-                      return (
-                        <TableRow key={s.nom}>
-                            <TableCell className="font-medium">{s.nom}</TableCell>
-                            <TableCell className="text-right font-medium">{formatHoursDecimalWithH(s.heures)} h</TableCell>
-                            <TableCell className="text-right">{formatHoursDecimalWithH(s.heuresPrevues)} h</TableCell>
-                            <TableCell className={`text-right font-medium ${ (s.heures - s.heuresPrevues) > 0 ? 'text-destructive' : 'text-primary' }`}>{formatHoursDecimalWithH(s.heures - s.heuresPrevues)} h</TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <div className="flex-1 h-3 bg-secondary rounded-full overflow-hidden">
-                                  <div
-                                    className="h-full bg-primary rounded-full transition-all duration-500"
-                                    style={{ width: `${pct}%` }}
-                                  />
-                                </div>
-                                <span className="text-xs font-semibold text-muted-foreground w-10 text-right">{pct.toFixed(0)}%</span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right font-semibold text-primary">{formatCurrency(s.cout)}</TableCell>
-                          </TableRow>);
-
-                    })}
-                    </TableBody>
-                  </Table>
-                </>
-              );
-
-          })()
-            )}
-          </CardContent>
-        </Card>
+      {/* Gantt Chart */}
+      <GanttChart
+        chantiers={chantiers}
+        timeEntries={timeEntries}
+        employees={employees}
+        hourCategories={hourCategories}
+        currentDate={currentDate}
+        markers={markers}
+        onAddMarker={handleAddMarker}
+        onDeleteMarker={handleDeleteMarker}
+      />
 
       {/* Week Calendar */}
       <div className="grid grid-cols-5 gap-3">
@@ -532,122 +583,122 @@ const Dashboard = () => {
 
       {/* Add Entry Dialog */}
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-hidden">
           <DialogHeader>
             <DialogTitle>
               {selectedDay && <>Ajouter des heures — {format(selectedDay, 'EEEE d MMMM', { locale: fr })}</>}
             </DialogTitle>
           </DialogHeader>
 
-          {/* Existing entries */}
-          {selectedDay && (() => {
-            const dateStr = format(selectedDay, 'yyyy-MM-dd');
-            const dayEntries = timeEntries.filter((e) => e.date === dateStr);
-            if (dayEntries.length === 0) return null;
-            return (
-              <div className="space-y-2">
-                <Label className="text-sm text-muted-foreground">Entrées existantes</Label>
-                {dayEntries.map((entry) => {
-                  const emp = getEmployeeById(entry.employeeId);
-                  const ch = entry.chantierId ? getChantierById(entry.chantierId) : null;
-                  const cat = entry.hourCategoryId ? getHourCategoryById(entry.hourCategoryId) : null;
-                  return (
-                    <div key={entry.id} className="flex flex-col bg-muted rounded-md p-2 text-sm gap-1">
-                      <div className="flex items-center justify-between">
+          <div className="overflow-y-auto space-y-4 pr-1 max-h-[72vh]">
+            {/* Existing entries */}
+            {selectedDay && (() => {
+              const dateStr = format(selectedDay, 'yyyy-MM-dd');
+              const dayEntries = timeEntries.filter((e) => e.date === dateStr);
+              if (dayEntries.length === 0) return null;
+              return (
+                <div className="space-y-2">
+                  <Label className="text-sm text-muted-foreground">Entrées existantes</Label>
+                  {dayEntries.map((entry) => {
+                    const emp = getEmployeeById(entry.employeeId);
+                    const ch = entry.chantierId ? getChantierById(entry.chantierId) : null;
+                    const cat = entry.hourCategoryId ? getHourCategoryById(entry.hourCategoryId) : null;
+                    return (
+                      <div key={entry.id} className="flex flex-col bg-muted rounded-md p-2 text-sm gap-1">
+                        <div className="flex items-center justify-between">
                           <div>
                             <span className="font-medium">{emp?.prenom} {emp?.nom}</span>
                             <span className="text-muted-foreground"> — {entry.chantierId ? ch?.nom : 'Bureau'} — {entry.heures}h</span>
-                        {cat && <span className="text-muted-foreground"> ({cat.nom})</span>}
+                            {cat && <span className="text-muted-foreground"> ({cat.nom})</span>}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditEntry(entry)}>
+                              <Edit className="h-3.5 w-3.5 text-primary" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => deleteTimeEntry(entry.id)}>
+                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                            </Button>
+                          </div>
+                        </div>
+                        {entry.description && (
+                          <div className="text-xs text-muted-foreground italic">
+                            💬 {entry.description}
+                          </div>
+                        )}
                       </div>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => deleteTimeEntry(entry.id)}>
-                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                      </Button>
-                    </div>
-                    {entry.description && (
-                      <div className="text-xs text-muted-foreground italic">
-                        💬 {entry.description}
-                      </div>
-                    )}
-                    </div>);
+                    );
+                  })}
+                </div>
+              );
+            })()}
 
-                })}
-              </div>);
+            <div className="grid gap-4 py-2">
+              {!isBureauSelected && (
+                <div className="grid gap-2">
+                  <Label className="text-base">Chantier</Label>
+                  <Select value={selectedChantierId} onValueChange={setSelectedChantierId}>
+                    <SelectTrigger className="h-12"><SelectValue placeholder="Sélectionner un chantier" /></SelectTrigger>
+                    <SelectContent>
+                      {chantiers.map((ch) => (
+                        <SelectItem key={ch.id} value={ch.id}>{ch.nom}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
-          })()}
-
-          <div className="grid gap-4 py-2">
-            {!isBureauSelected &&
-            <div className="grid gap-2">
-                <Label className="text-base">Chantier</Label>
-                <Select value={selectedChantierId} onValueChange={setSelectedChantierId}>
-                  <SelectTrigger className="h-12"><SelectValue placeholder="Sélectionner un chantier" /></SelectTrigger>
+              <div className="grid gap-2">
+                <Label className="text-base">Employé</Label>
+                <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
+                  <SelectTrigger className="h-12"><SelectValue placeholder="Sélectionner un employé" /></SelectTrigger>
                   <SelectContent>
-                    {chantiers.map((ch) =>
-                  <SelectItem key={ch.id} value={ch.id}>{ch.nom}</SelectItem>
-                  )}
+                    {employees.map((emp) => (
+                      <SelectItem key={emp.id} value={emp.id}>{emp.prenom} {emp.nom}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
-            }
 
-            {isBureauSelected &&
-            <div className="rounded-md bg-accent/50 p-3 text-sm text-muted-foreground">
-                Les heures Bureau seront réparties automatiquement sur les chantiers au prorata des heures du mois.
+              <div className="grid gap-2">
+                <Label className="text-base">Catégorie d'heures</Label>
+                <Select value={selectedHourCategoryId} onValueChange={(val) => {
+                  setSelectedHourCategoryId(val);
+                  const cat = hourCategories.find((c) => c.id === val);
+                  if (cat?.isBureau) setSelectedChantierId('');
+                }}>
+                  <SelectTrigger className="h-12"><SelectValue placeholder="Sélectionner une catégorie" /></SelectTrigger>
+                  <SelectContent>
+                    {hourCategories.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        {cat.nom} ({cat.pourcentage > 0 ? '+' : ''}{cat.pourcentage}%)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            }
 
-            <div className="grid gap-2">
-              <Label className="text-base">Employé</Label>
-              <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
-                <SelectTrigger className="h-12"><SelectValue placeholder="Sélectionner un employé" /></SelectTrigger>
-                <SelectContent>
-                  {employees.map((emp) =>
-                  <SelectItem key={emp.id} value={emp.id}>{emp.prenom} {emp.nom}</SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid gap-2">
-              <Label className="text-base">Catégorie d'heures</Label>
-              <Select value={selectedHourCategoryId} onValueChange={(val) => {
-                setSelectedHourCategoryId(val);
-                // Clear chantier when switching to bureau
-                const cat = hourCategories.find((c) => c.id === val);
-                if (cat?.isBureau) setSelectedChantierId('');
-              }}>
-                <SelectTrigger className="h-12"><SelectValue placeholder="Sélectionner une catégorie" /></SelectTrigger>
-                <SelectContent>
-                  {hourCategories.map((cat) =>
-                  <SelectItem key={cat.id} value={cat.id}>
-                      {cat.nom} ({cat.pourcentage > 0 ? '+' : ''}{cat.pourcentage}%)
-                    </SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid gap-2">
-              <Label className="text-base">Nombre d'heures</Label>
-              <Input type="number" step="0.5" value={heures} onChange={(e) => setHeures(e.target.value)} placeholder="8" className="h-12 text-lg" />
-            </div>
-
-            {previewCost !== null &&
-            <div className="rounded-md bg-muted p-3 text-sm">
-                <span className="text-muted-foreground">Coût estimé : </span>
-                <span className="font-semibold text-primary">{formatCurrency(previewCost)}</span>
+              <div className="grid gap-2">
+                <Label className="text-base">Nombre d'heures</Label>
+                <Input type="number" step="0.5" value={heures} onChange={(e) => setHeures(e.target.value)} placeholder="8" className="h-12 text-lg" />
               </div>
-            }
 
-            <div className="grid gap-2">
-              <Label className="text-base">Résumé (optionnel)</Label>
-              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description du travail effectué..." rows={3} className="resize-none text-base" />
+              {previewCost !== null && (
+                <div className="rounded-md bg-muted p-3 text-sm">
+                  <span className="text-muted-foreground">Coût estimé : </span>
+                  <span className="font-semibold text-primary">{formatCurrency(previewCost)}</span>
+                </div>
+              )}
+
+              <div className="grid gap-2">
+                <Label className="text-base">Résumé (optionnel)</Label>
+                <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description du travail effectué..." rows={3} className="resize-none text-base" />
+              </div>
             </div>
           </div>
 
           <DialogFooter>
             <Button onClick={handleAddEntry} disabled={!isBureauSelected && !selectedChantierId || !selectedEmployeeId || !heures} className="h-12 px-6 text-base">
-              <Plus className="mr-2 h-5 w-5" />Ajouter
+              <Plus className="mr-2 h-5 w-5" />{editingEntryId ? 'Enregistrer' : 'Ajouter'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -661,6 +712,7 @@ const Dashboard = () => {
         timeEntries={timeEntries}
         chantiers={chantiers}
         hourCategories={hourCategories}
+        materialCosts={materialCosts}
       />
     </div>);
 
