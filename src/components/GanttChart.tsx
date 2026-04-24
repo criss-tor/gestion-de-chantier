@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, addMonths, subMonths, isSameMonth, isSameDay, parseISO, isWeekend } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, addMonths, subMonths, addWeeks, subWeeks, isSameMonth, isSameDay, parseISO, isWeekend } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Calendar, Flag, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, Flag, Trash2, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -70,12 +70,23 @@ export default function GanttChart({
   const [newMarkerType, setNewMarkerType] = useState<GanttMarker['type']>('appointment');
   const [newMarkerLabel, setNewMarkerLabel] = useState('');
 
-  // Calculate days to display
-  const monthStart = startOfMonth(viewDate);
-  const monthEnd = endOfMonth(viewDate);
-  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 });
-  const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
-  const days = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
+  // View mode: month or week
+  const [viewMode, setViewMode] = useState<'month' | 'week'>('month');
+
+  // Calculate days to display based on view mode
+  const days = useMemo(() => {
+    if (viewMode === 'month') {
+      const monthStart = startOfMonth(viewDate);
+      const monthEnd = endOfMonth(viewDate);
+      const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 });
+      const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
+      return eachDayOfInterval({ start: calendarStart, end: calendarEnd });
+    } else {
+      const weekStart = startOfWeek(viewDate, { weekStartsOn: 1 });
+      const weekEnd = endOfWeek(viewDate, { weekStartsOn: 1 });
+      return eachDayOfInterval({ start: weekStart, end: weekEnd });
+    }
+  }, [viewDate, viewMode]);
 
   // Get weeks for header
   const weeks = useMemo(() => {
@@ -126,14 +137,14 @@ export default function GanttChart({
     });
   };
 
-  const handlePrevMonth = () => {
-    const newDate = subMonths(viewDate, 1);
+  const handlePrev = () => {
+    const newDate = viewMode === 'month' ? subMonths(viewDate, 1) : subWeeks(viewDate, 1);
     setViewDate(newDate);
     onMonthChange?.(newDate);
   };
 
-  const handleNextMonth = () => {
-    const newDate = addMonths(viewDate, 1);
+  const handleNext = () => {
+    const newDate = viewMode === 'month' ? addMonths(viewDate, 1) : addWeeks(viewDate, 1);
     setViewDate(newDate);
     onMonthChange?.(newDate);
   };
@@ -142,6 +153,10 @@ export default function GanttChart({
     const newDate = new Date();
     setViewDate(newDate);
     onMonthChange?.(newDate);
+  };
+
+  const handleToggleViewMode = () => {
+    setViewMode((prev) => (prev === 'month' ? 'week' : 'month'));
   };
 
   const handleOpenAddMarker = () => {
@@ -267,12 +282,15 @@ export default function GanttChart({
                 <Flag className="h-4 w-4 mr-1" />
                 Marqueur
               </Button>
-              <Button variant="outline" size="icon" onClick={handlePrevMonth}>
+              <Button variant="outline" size="icon" onClick={handlePrev}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <Button variant="outline" onClick={handleToday}>Aujourd'hui</Button>
-              <Button variant="outline" size="icon" onClick={handleNextMonth}>
+              <Button variant="outline" size="icon" onClick={handleNext}>
                 <ChevronRight className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleToggleViewMode}>
+                {viewMode === 'month' ? 'Semaine' : 'Mois'}
               </Button>
             </div>
           </div>
