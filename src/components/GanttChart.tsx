@@ -114,10 +114,16 @@ export default function GanttChart({
     return timeEntries.filter((e) => e.employeeId && e.chantierId === chantierId && e.date === dateStr);
   };
 
-  // Get markers for a chantier on a specific day
+  // Get markers for a chantier on a specific day (including range markers)
   const getMarkersForDay = (chantierId: string, day: Date) => {
     const dateStr = format(day, 'yyyy-MM-dd');
-    return markers.filter((m) => m.chantierId === chantierId && m.date === dateStr);
+    return markers.filter((m) => {
+      if (m.chantierId !== chantierId) return false;
+      if ((m.type === 'range' || m.type === 'appointment') && m.endDate) {
+        return dateStr >= m.date && dateStr <= m.endDate;
+      }
+      return m.date === dateStr;
+    });
   };
 
   const handlePrevMonth = () => {
@@ -323,10 +329,10 @@ export default function GanttChart({
                   </tr>
                 </thead>
                 <tbody>
-                  {activeChantiers.map((chantier) => {
+                  {activeChantiers.map((chantier, index) => {
                     const totalHours = getChantierMonthHours(chantier.id);
                     return (
-                      <tr key={chantier.id} className="hover:bg-muted/30">
+                      <tr key={chantier.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-green-100`}>
                         <td
                           className="p-2 text-sm font-medium cursor-pointer hover:text-primary hover:underline"
                           onClick={() => handleChantierClick(chantier.id)}
