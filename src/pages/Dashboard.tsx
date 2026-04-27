@@ -763,6 +763,7 @@ const Dashboard = () => {
         chantiers={chantiers}
         hourCategories={hourCategories}
         materialCosts={materialCosts}
+        ganttMarkers={markers}
       />
     </div>);
 
