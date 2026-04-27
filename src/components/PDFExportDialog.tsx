@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Download, Calendar, Users, Building2, FileSpreadsheet } from 'lucide-react';
+import { FileText, Download, Calendar, Users, Building2, FileSpreadsheet, GanttChart } from 'lucide-react';
 import { Employee, TimeEntry, Chantier, HourCategory, MaterialCost } from '@/types/employee';
 import { pdfExportService } from '@/lib/pdfExport';
 import { format, subMonths } from 'date-fns';
@@ -32,6 +32,26 @@ interface PDFExportDialogProps {
   materialCosts: MaterialCost[];
 }
 
+interface GanttMarker {
+  id: string;
+  chantierId: string;
+  date: string;
+  endDate?: string;
+  type: 'milestone' | 'appointment' | 'end-date' | 'custom' | 'range';
+  label: string;
+}
+
+interface PDFExportDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  employees: Employee[];
+  timeEntries: TimeEntry[];
+  chantiers: Chantier[];
+  hourCategories: HourCategory[];
+  materialCosts: MaterialCost[];
+  ganttMarkers?: GanttMarker[];
+}
+
 export function PDFExportDialog({
   open,
   onOpenChange,
@@ -39,9 +59,10 @@ export function PDFExportDialog({
   timeEntries,
   chantiers,
   hourCategories,
-  materialCosts
+  materialCosts,
+  ganttMarkers = []
 }: PDFExportDialogProps) {
-  const [exportType, setExportType] = useState<'employee' | 'chantier' | 'global'>('employee');
+  const [exportType, setExportType] = useState<'employee' | 'chantier' | 'global' | 'gantt'>('employee');
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
   const [selectedChantierId, setSelectedChantierId] = useState<string>('');
   const [selectedMonth, setSelectedMonth] = useState<string>(format(new Date(), 'yyyy-MM'));
@@ -112,6 +133,17 @@ export function PDFExportDialog({
           );
           break;
         }
+        case 'gantt': {
+          await pdfExportService.exportGanttMonthly(
+            chantiers,
+            timeEntries,
+            employees,
+            hourCategories,
+            selectedMonth,
+            ganttMarkers
+          );
+          break;
+        }
       }
       
       onOpenChange(false);
@@ -131,6 +163,8 @@ export function PDFExportDialog({
         return 'Génère un bilan complet du chantier avec résumé par catégories';
       case 'global':
         return 'Génère un résumé global de tous les employés et chantiers';
+      case 'gantt':
+        return 'Génère un planning Gantt mensuel avec tous les chantiers et heures';
     }
   };
 
@@ -154,7 +188,7 @@ export function PDFExportDialog({
           {/* Type d'export */}
           <div className="space-y-2">
             <Label>Type de rapport</Label>
-            <Select value={exportType} onValueChange={(value: 'employee' | 'chantier' | 'global') => setExportType(value)}>
+            <Select value={exportType} onValueChange={(value: 'employee' | 'chantier' | 'global' | 'gantt') => setExportType(value)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -175,6 +209,12 @@ export function PDFExportDialog({
                   <div className="flex items-center gap-2">
                     <FileSpreadsheet className="h-4 w-4" />
                     Résumé global
+                  </div>
+                </SelectItem>
+                <SelectItem value="gantt">
+                  <div className="flex items-center gap-2">
+                    <GanttChart className="h-4 w-4" />
+                    Planning Gantt mensuel
                   </div>
                 </SelectItem>
               </SelectContent>
@@ -283,7 +323,8 @@ export function PDFExportDialog({
             onClick={handleExport} 
             disabled={isExporting || 
               (exportType === 'employee' && !selectedEmployeeId) ||
-              (exportType === 'chantier' && !selectedChantierId)}
+              (exportType === 'chantier' && !selectedChantierId) ||
+              (exportType === 'gantt' && chantiers.length === 0)}
             className="flex items-center gap-2"
           >
             <Download className="h-4 w-4" />

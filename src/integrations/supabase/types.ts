@@ -179,6 +179,47 @@ export type Database = {
           },
         ]
       }
+      gantt_markers: {
+        Row: {
+          id: string
+          chantier_id: string
+          date: string
+          end_date: string | null
+          type: string
+          label: string
+          color: string | null
+          created_at: string
+        }
+        Insert: {
+          id: string
+          chantier_id: string
+          date: string
+          end_date?: string | null
+          type: string
+          label: string
+          color?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          chantier_id?: string
+          date?: string
+          end_date?: string | null
+          type?: string
+          label?: string
+          color?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gantt_markers_chantier_id_fkey"
+            columns: ["chantier_id"]
+            isOneToOne: false
+            referencedRelation: "chantiers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

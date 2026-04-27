@@ -1,12 +1,22 @@
 import { Employee, TimeEntry, Chantier, MaterialCost, HourCategory, ChantierStats } from '@/types/employee';
 import * as XLSX from 'xlsx';
 
+interface GanttMarker {
+  id: string;
+  chantierId: string;
+  date: string;
+  endDate?: string;
+  type: 'milestone' | 'appointment' | 'end-date' | 'custom' | 'range';
+  label: string;
+}
+
 interface BackupData {
   employees: Employee[];
   timeEntries: TimeEntry[];
   chantiers: Chantier[];
   materialCosts: MaterialCost[];
   hourCategories: HourCategory[];
+  ganttMarkers: GanttMarker[];
 }
 
 export function exportBackup(data: BackupData): void {
@@ -50,6 +60,17 @@ export function exportBackup(data: BackupData): void {
   }));
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(mcRows), 'Matériaux');
 
+  // Gantt Markers sheet
+  const markerRows = data.ganttMarkers?.map(m => ({
+    ID: m.id,
+    'ID Chantier': m.chantierId,
+    Date: m.date,
+    'Date fin': m.endDate || '',
+    Type: m.type,
+    Label: m.label
+  })) || [];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(markerRows), 'Rendez-vous');
+
   XLSX.writeFile(wb, `sauvegarde_${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
@@ -91,7 +112,7 @@ export function exportChantierReport(chantiers: Chantier[], chantierStats: Chant
 export function importBackup(fileBuffer: ArrayBuffer): BackupData {
   const wb = XLSX.read(fileBuffer, { type: 'array' });
   const data: BackupData = {
-    employees: [], timeEntries: [], chantiers: [], materialCosts: [], hourCategories: [],
+    employees: [], timeEntries: [], chantiers: [], materialCosts: [], hourCategories: [], ganttMarkers: [],
   };
 
   // Employees
@@ -101,7 +122,7 @@ export function importBackup(fileBuffer: ArrayBuffer): BackupData {
     data.employees = rows.map((r: Record<string, unknown>) => ({
       id: String(r['ID'] ?? ''), nom: String(r['Nom'] ?? ''), prenom: String(r['Prénom'] ?? ''),
       coutHoraire: Number(r['Coût Horaire (€)'] ?? 0),
-      role: String(r['Rôle'] ?? 'employe'),
+      role: (String(r['Rôle'] ?? 'employe') as 'admin' | 'employe'),
       pin: String(r['Code PIN'] ?? '0000')
     }));
   }
@@ -151,6 +172,20 @@ export function importBackup(fileBuffer: ArrayBuffer): BackupData {
       id: String(r['ID'] ?? ''), chantierId: String(r['ID Chantier'] ?? ''),
       date: String(r['Date'] ?? ''), montant: Number(r['Montant (€)'] ?? 0),
       description: String(r['Description'] ?? '')
+    }));
+  }
+
+  // Gantt Markers
+  const markerSheet = wb.Sheets['Rendez-vous'];
+  if (markerSheet) {
+    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(markerSheet);
+    data.ganttMarkers = rows.map((r: Record<string, unknown>) => ({
+      id: String(r['ID'] ?? ''),
+      chantierId: String(r['ID Chantier'] ?? ''),
+      date: String(r['Date'] ?? ''),
+      endDate: r['Date fin'] ? String(r['Date fin']) : undefined,
+      type: String(r['Type'] ?? 'appointment') as any,
+      label: String(r['Label'] ?? '')
     }));
   }
 

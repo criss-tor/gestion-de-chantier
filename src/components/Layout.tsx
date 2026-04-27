@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
@@ -8,6 +8,7 @@ import { useEmployeeContext } from '@/contexts/EmployeeContext';
 import { exportBackup, importBackup } from '@/lib/backup';
 import { useToast } from '@/hooks/use-toast';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { supabase } from '@/integrations/supabase/client';
 
 export function Layout() {
   const { employees, timeEntries, chantiers, materialCosts, hourCategories, currentEmployeeId, setCurrentEmployee, restoreData, logout } = useEmployeeContext();
@@ -15,9 +16,32 @@ export function Layout() {
   const isAdmin = currentEmployee?.role === 'admin';
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const [ganttMarkers, setGanttMarkers] = useState<{ id: string; chantierId: string; date: string; endDate?: string; type: 'milestone' | 'appointment' | 'end-date' | 'custom' | 'range'; label: string }[]>([]);
+
+  // Load markers from Supabase
+  useEffect(() => {
+    const loadMarkers = async () => {
+      const { data, error } = await supabase.from('gantt_markers').select('*').order('date', { ascending: true });
+      if (error) {
+        console.error('Error loading markers:', error);
+        return;
+      }
+      if (data) {
+        setGanttMarkers(data.map(m => ({
+          id: m.id,
+          chantierId: m.chantier_id,
+          date: m.date,
+          endDate: m.end_date || undefined,
+          type: m.type as any,
+          label: m.label
+        })));
+      }
+    };
+    loadMarkers();
+  }, []);
 
   const handleExport = () => {
-    exportBackup({ employees, timeEntries, chantiers, materialCosts, hourCategories });
+    exportBackup({ employees, timeEntries, chantiers, materialCosts, hourCategories, ganttMarkers });
     toast({ title: 'Sauvegarde exportée', description: 'Le fichier Excel a été téléchargé.' });
   };
 
@@ -25,11 +49,30 @@ export function Layout() {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
       try {
         const data = importBackup(ev.target?.result as ArrayBuffer);
         restoreData(data);
-        toast({ title: 'Restauration réussie', description: `${data.employees.length} employés, ${data.timeEntries.length} entrées, ${data.chantiers.length} chantiers restaurés.` });
+        // Restore Gantt markers if present
+        if (data.ganttMarkers && data.ganttMarkers.length > 0) {
+          // Insert markers into Supabase
+          const { error } = await supabase.from('gantt_markers').insert(
+            data.ganttMarkers.map(m => ({
+              chantier_id: m.chantierId,
+              date: m.date,
+              end_date: m.endDate || null,
+              type: m.type,
+              label: m.label,
+              color: null
+            })) as any
+          );
+          if (error) {
+            console.error('Error restoring markers:', error);
+          } else {
+            setGanttMarkers(data.ganttMarkers);
+          }
+        }
+        toast({ title: 'Restauration réussie', description: `${data.employees.length} employés, ${data.timeEntries.length} entrées, ${data.chantiers.length} chantiers${data.ganttMarkers?.length ? ', ' + data.ganttMarkers.length + ' rendez-vous' : ''} restaurés.` });
       } catch {
         toast({ title: 'Erreur', description: 'Le fichier Excel est invalide.', variant: 'destructive' });
       }

@@ -388,18 +388,27 @@ export default function GanttChart({
                                   </span>
                                 </div>
                               )}
-                              {dayMarkers.map((marker) => (
-                                <div
-                                  key={marker.id}
-                                  className={`cursor-pointer mx-auto ${
-                                    marker.type === 'range' || (marker.type === 'appointment' && marker.endDate && marker.endDate !== marker.date)
-                                      ? 'h-2 w-full rounded-sm'
-                                      : 'w-3 h-3 rounded-full'
-                                  } ${getMarkerColor(marker.type)}`}
-                                  title={marker.label}
-                                  onClick={() => handleMarkerClick(marker)}
-                                />
-                              ))}
+                              {dayMarkers.map((marker) => {
+                                const isRange = marker.type === 'range' || (marker.type === 'appointment' && marker.endDate && marker.endDate !== marker.date);
+                                return (
+                                  <div
+                                    key={marker.id}
+                                    className={`cursor-pointer mx-auto overflow-hidden ${
+                                      isRange
+                                        ? 'h-5 w-full rounded px-1 flex items-center justify-center'
+                                        : 'w-4 h-4 rounded-full flex items-center justify-center'
+                                    } ${getMarkerColor(marker.type)}`}
+                                    title={`${marker.label}${marker.endDate ? ` (${format(parseISO(marker.date), 'dd/MM')} - ${format(parseISO(marker.endDate), 'dd/MM')})` : ` (${format(parseISO(marker.date), 'dd/MM')})`}`}
+                                    onClick={() => handleMarkerClick(marker)}
+                                  >
+                                    {isRange && (
+                                      <span className="text-[8px] font-medium text-white truncate leading-none">
+                                        {marker.label}
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </td>
                           );
                         })}

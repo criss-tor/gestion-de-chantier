@@ -158,7 +158,7 @@ export class PDFExportService {
     pdf.save(fileName);
   }
 
-  // Export PDF du bilan par chantier (tout le chantier, pas seulement un mois)
+  // Export PDF du bilan par chantier
   async exportChantierReport(
     chantier: Chantier,
     entries: TimeEntry[],
@@ -230,10 +230,10 @@ export class PDFExportService {
     // Afficher le résumé par catégories
     pdf.setFontSize(12);
     pdf.setFont('helvetica', 'bold');
-    pdf.text('Résumé par catégories:', 20, 140);
+    pdf.text('Résumé par catégories:', 20, 155);
     pdf.setFont('helvetica', 'normal');
     
-    let categoryYPosition = 150;
+    let categoryYPosition = 165;
     pdf.setFontSize(10);
     
     if (hoursByCategory.size === 0) {
@@ -263,104 +263,6 @@ export class PDFExportService {
         pdf.text(`${data.cost.toFixed(2)} CHF`, 120, categoryYPosition);
         pdf.text(`${percentage}%`, 160, categoryYPosition);
         categoryYPosition += 6;
-      });
-    }
-    
-    // Détails des entrées avec descriptions
-    let detailsYPosition = categoryYPosition > 200 ? categoryYPosition + 20 : categoryYPosition + 10;
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('Détail des heures et commentaires:', 20, detailsYPosition);
-    detailsYPosition += 10;
-    
-    pdf.setFontSize(9);
-    pdf.setFont('helvetica', 'normal');
-    
-    if (chantierEntries.length === 0) {
-      pdf.text('Aucune entrée pour ce chantier', 20, detailsYPosition);
-    } else {
-      if (chantierMaterials.length > 0) {
-        detailsYPosition += 8;
-        pdf.setFont('helvetica', 'bold');
-        pdf.text('Coûts matériels:', 20, detailsYPosition);
-        detailsYPosition += 8;
-        pdf.setFont('helvetica', 'normal');
-        chantierMaterials.forEach((cost) => {
-          if (detailsYPosition > 250) {
-            pdf.addPage();
-            detailsYPosition = 30;
-          }
-          pdf.text(`- ${cost.date} ${cost.description || ''}: ${cost.montant.toFixed(2)} CHF`, 25, detailsYPosition);
-          detailsYPosition += 6;
-        });
-      }
-      // Grouper par date, puis par catégorie
-      const entriesByDate = chantierEntries.reduce((acc, entry) => {
-        if (!acc[entry.date]) acc[entry.date] = {};
-        const catId = entry.hourCategoryId || 'none';
-        if (!acc[entry.date][catId]) acc[entry.date][catId] = [];
-        acc[entry.date][catId].push(entry);
-        return acc;
-      }, {} as Record<string, Record<string, TimeEntry[]>>);
-      
-      const sortedDates = Object.keys(entriesByDate).sort();
-      
-      sortedDates.forEach((date) => {
-        if (detailsYPosition > 250) {
-          pdf.addPage();
-          detailsYPosition = 30;
-        }
-        
-        // Date en gras
-        pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(10);
-        pdf.text(format(new Date(date), 'dd/MM/yyyy', { locale: fr }), 20, detailsYPosition);
-        pdf.setFont('helvetica', 'normal');
-        detailsYPosition += 8;
-        
-        // Grouper par catégorie pour cette date
-        const entriesByCategory = entriesByDate[date];
-        
-        Object.entries(entriesByCategory).forEach(([catId, entries]) => {
-          if (detailsYPosition > 270) {
-            pdf.addPage();
-            detailsYPosition = 30;
-          }
-          
-          // Nom de catégorie en italique
-          const category = categories.find(c => c.id === catId);
-          const catName = category ? category.nom : 'Non défini';
-          pdf.setFont('helvetica', 'italic');
-          pdf.setFontSize(9);
-          pdf.text(`  ${catName}:`, 25, detailsYPosition);
-          pdf.setFont('helvetica', 'normal');
-          detailsYPosition += 5;
-          
-          // Entrées de cette catégorie
-          entries.forEach((entry) => {
-            if (detailsYPosition > 275) {
-              pdf.addPage();
-              detailsYPosition = 30;
-            }
-            
-            const employee = employees.find(emp => emp.id === entry.employeeId);
-            const empName = employee ? `${employee.prenom} ${employee.nom}` : 'Inconnu';
-            
-            pdf.setFontSize(9);
-            pdf.text(`    • ${empName}: ${entry.heures.toFixed(2)}h`, 30, detailsYPosition);
-            detailsYPosition += 4;
-            
-            if (entry.description) {
-              pdf.setFontSize(8);
-              pdf.text(`      "${entry.description}"`, 30, detailsYPosition);
-              pdf.setFontSize(9);
-              detailsYPosition += 4;
-            }
-          });
-          
-          detailsYPosition += 2;
-        });
-        
-        detailsYPosition += 5;
       });
     }
     
@@ -465,7 +367,7 @@ export class PDFExportService {
       employeeEntries.forEach(entry => {
         const category = entry.hourCategoryId && getHourCategoryById ? getHourCategoryById(entry.hourCategoryId) : null;
         
-        let categoryType = 'atelier'; // default
+        let categoryType = 'atelier';
         if (category) {
           const categoryName = category.nom.toLowerCase();
           if (category.isBureau) {
@@ -488,7 +390,7 @@ export class PDFExportService {
       const empTotalHours = atelierHours + poseHours + dessinHours + bureauHours;
       const empUniqueDays = new Set(employeeEntries.map(e => e.date)).size;
 
-      if (empTotalHours === 0) return; // Ne pas afficher les employés sans heures
+      if (empTotalHours === 0) return;
 
       if (yPosition > 250) {
         pdf.addPage();
@@ -525,7 +427,7 @@ export class PDFExportService {
         return { nom: chantier.nom, heures: totalHours };
       }).filter(stat => stat.heures > 0)
         .sort((a, b) => b.heures - a.heures)
-        .slice(0, 5); // Top 5
+        .slice(0, 5);
 
       chantierStats.forEach((stat, index) => {
         if (yPosition > 250) {
@@ -552,6 +454,230 @@ export class PDFExportService {
     const [year, monthNum] = month.split('-');
     const date = new Date(parseInt(year), parseInt(monthNum) - 1);
     return format(date, 'MMMM yyyy', { locale: fr });
+  }
+
+  // Export PDF du planning Gantt mensuel
+  async exportGanttMonthly(
+    chantiers: Chantier[],
+    entries: TimeEntry[],
+    employees: Employee[],
+    categories: HourCategory[],
+    month: string,
+    markers?: { id: string; chantierId: string; date: string; endDate?: string; type: string; label: string }[]
+  ): Promise<void> {
+    const pdf = new jsPDF('landscape');
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+
+    // En-tête
+    pdf.setFontSize(20);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(`Planning Gantt - ${this.formatMonth(month)}`, pageWidth / 2, 20, { align: 'center' });
+
+    // Filtrer les entrées du mois
+    const monthEntries = entries.filter(e => e.date.startsWith(month));
+
+    // Calculer les jours du mois
+    const [year, monthNum] = month.split('-');
+    const daysInMonth = new Date(parseInt(year), parseInt(monthNum), 0).getDate();
+
+    // Dimensions
+    const startX = 50;
+    const startY = 40;
+    const rowHeight = 12;
+    const colWidth = (pageWidth - startX - 20) / daysInMonth;
+    const chantierColWidth = 45;
+
+    // En-têtes des jours
+    pdf.setFontSize(7);
+    pdf.setFont('helvetica', 'normal');
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const x = startX + chantierColWidth + (day - 1) * colWidth;
+      const date = new Date(parseInt(year), parseInt(monthNum) - 1, day);
+      const dayName = format(date, 'EEE', { locale: fr }).substring(0, 2);
+      const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+
+      // Fond gris pour week-end
+      if (isWeekend) {
+        pdf.setFillColor(240, 240, 240);
+        pdf.rect(x, startY - 5, colWidth, rowHeight * (chantiers.length + 1), 'F');
+      }
+
+      pdf.text(dayName, x + colWidth / 2, startY, { align: 'center' });
+      pdf.text(day.toString(), x + colWidth / 2, startY + 4, { align: 'center' });
+    }
+
+    // Ligne de séparation sous les en-têtes
+    pdf.line(startX, startY + 5, pageWidth - 20, startY + 5);
+
+    // Afficher les marqueurs au-dessus du tableau
+    if (markers && markers.length > 0) {
+      const monthMarkers = markers.filter(m => {
+        if (m.endDate) {
+          return m.date.startsWith(month) || m.endDate.startsWith(month) || 
+                 (m.date <= month + '-31' && m.endDate >= month + '-01');
+        }
+        return m.date.startsWith(month);
+      });
+      
+      if (monthMarkers.length > 0) {
+        let markerY = startY - 20;
+        pdf.setFontSize(8);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('Rendez-vous & Plages:', startX, markerY);
+        pdf.setFont('helvetica', 'normal');
+        
+        monthMarkers.slice(0, 5).forEach((marker, idx) => {
+          const chantier = chantiers.find(c => c.id === marker.chantierId);
+          const markerText = `${marker.label} (${chantier?.nom || '?'}) - ${format(new Date(marker.date), 'dd/MM', { locale: fr })}${marker.endDate ? ' au ' + format(new Date(marker.endDate), 'dd/MM', { locale: fr }) : ''}`;
+          pdf.setFontSize(7);
+          pdf.text(markerText, startX + 5, markerY + 5 + (idx * 4));
+        });
+        
+        if (monthMarkers.length > 5) {
+          pdf.text(`... et ${monthMarkers.length - 5} autres`, startX + 5, markerY + 5 + (5 * 4));
+        }
+      }
+    }
+
+    // Lignes des chantiers
+    let yPosition = startY + 12;
+
+    chantiers.forEach((chantier) => {
+      // Nom du chantier (tronqué si trop long)
+      pdf.setFontSize(9);
+      pdf.setFont('helvetica', 'bold');
+      const chantierName = chantier.nom.length > 20 ? chantier.nom.substring(0, 20) + '...' : chantier.nom;
+      pdf.text(chantierName, startX + 2, yPosition + 4);
+
+      // Heures du chantier pour ce mois
+      const chantierEntries = monthEntries.filter(e => e.chantierId === chantier.id);
+      const totalHours = chantierEntries.reduce((sum, e) => sum + e.heures, 0);
+
+      // Afficher les heures à droite du nom
+      pdf.setFontSize(7);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(`${totalHours.toFixed(1)}h`, startX + chantierColWidth - 2, yPosition + 4, { align: 'right' });
+
+      // Cases pour chaque jour
+      pdf.setFontSize(6);
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        const x = startX + chantierColWidth + (day - 1) * colWidth;
+        const dateStr = `${month}-${day.toString().padStart(2, '0')}`;
+        const dayEntries = chantierEntries.filter(e => e.date === dateStr);
+        
+        // Vérifier s'il y a un marqueur pour ce jour et ce chantier
+        const dayMarkers = markers?.filter(m => {
+          if (m.chantierId !== chantier.id) return false;
+          if (m.endDate) {
+            return dateStr >= m.date && dateStr <= m.endDate;
+          }
+          return m.date === dateStr;
+        }) || [];
+
+        if (dayEntries.length > 0 || dayMarkers.length > 0) {
+          const dayHours = dayEntries.reduce((sum, e) => sum + e.heures, 0);
+
+          // Calculer le nombre d'employés différents ce jour
+          const uniqueEmployees = new Set(dayEntries.map(e => e.employeeId)).size;
+
+          // Couleur selon le nombre d'employés (ou rouge si marqueur)
+          if (dayMarkers.length > 0) {
+            pdf.setFillColor(239, 68, 68); // Rouge pour marqueur
+          } else if (uniqueEmployees >= 3) {
+            pdf.setFillColor(34, 197, 94); // Vert foncé
+          } else if (uniqueEmployees === 2) {
+            pdf.setFillColor(132, 204, 22); // Vert clair
+          } else {
+            pdf.setFillColor(253, 186, 116); // Orange
+          }
+
+          pdf.rect(x + 1, yPosition, colWidth - 2, rowHeight - 2, 'F');
+
+          // Afficher les heures si assez de place
+          if (colWidth > 8 && dayHours >= 1) {
+            pdf.setTextColor(255, 255, 255);
+            pdf.text(dayHours.toFixed(1), x + colWidth / 2, yPosition + 5, { align: 'center' });
+            pdf.setTextColor(0, 0, 0);
+          }
+          
+          // Petite indication si marqueur
+          if (dayMarkers.length > 0 && colWidth > 12) {
+            pdf.setTextColor(255, 255, 255);
+            pdf.setFontSize(5);
+            pdf.text('●', x + colWidth - 3, yPosition + 3);
+            pdf.setFontSize(6);
+            pdf.setTextColor(0, 0, 0);
+          }
+        }
+
+        // Bordure de la case
+        pdf.rect(x, yPosition - 2, colWidth, rowHeight);
+      }
+
+      yPosition += rowHeight;
+
+      // Nouvelle page si nécessaire
+      if (yPosition > pageHeight - 30) {
+        pdf.addPage('landscape');
+        yPosition = 30;
+
+        // Réimprimer les en-têtes des jours sur la nouvelle page
+        pdf.setFontSize(7);
+        for (let day = 1; day <= daysInMonth; day++) {
+          const x = startX + chantierColWidth + (day - 1) * colWidth;
+          const date = new Date(parseInt(year), parseInt(monthNum) - 1, day);
+          const dayName = format(date, 'EEE', { locale: fr }).substring(0, 2);
+          pdf.text(dayName, x + colWidth / 2, yPosition - 10, { align: 'center' });
+          pdf.text(day.toString(), x + colWidth / 2, yPosition - 6, { align: 'center' });
+        }
+        pdf.line(startX, yPosition - 2, pageWidth - 20, yPosition - 2);
+        yPosition += 5;
+      }
+    });
+
+    // Légende
+    const legendY = pageHeight - 20;
+    pdf.setFontSize(9);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Légende:', 20, legendY);
+
+    pdf.setFontSize(8);
+    pdf.setFont('helvetica', 'normal');
+
+    // Cases légende
+    pdf.setFillColor(34, 197, 94);
+    pdf.rect(50, legendY - 4, 8, 6, 'F');
+    pdf.text('3+ pers.', 62, legendY);
+
+    pdf.setFillColor(132, 204, 22);
+    pdf.rect(90, legendY - 4, 8, 6, 'F');
+    pdf.text('2 pers.', 102, legendY);
+
+    pdf.setFillColor(253, 186, 116);
+    pdf.rect(125, legendY - 4, 8, 6, 'F');
+    pdf.text('1 pers.', 137, legendY);
+
+    pdf.setFillColor(239, 68, 68);
+    pdf.rect(160, legendY - 4, 8, 6, 'F');
+    pdf.text('Rdv/Plage', 172, legendY);
+
+    // Total général
+    const totalHours = monthEntries.reduce((sum, e) => sum + e.heures, 0);
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(`Total mois: ${totalHours.toFixed(1)} h`, pageWidth - 60, legendY);
+
+    // Pied de page
+    pdf.setFontSize(8);
+    pdf.setFont('helvetica', 'italic');
+    pdf.text(`Généré le ${format(new Date(), 'dd/MM/yyyy HH:mm', { locale: fr })}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+
+    // Télécharger
+    const fileName = `planning_gantt_${month}.pdf`;
+    pdf.save(fileName);
   }
 }
 

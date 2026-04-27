@@ -1,39 +1,22 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useEmployeeContext } from '@/contexts/EmployeeContext';
+import { supabase } from '@/integrations/supabase/client';
 import { formatHoursDecimalWithH } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter } from
-'@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue } from
-'@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow } from
-'@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ChevronLeft, ChevronRight, Plus, Clock, Trash2, Edit, Timer, HardHat, Download } from 'lucide-react';
 import { format, startOfWeek, addDays, addWeeks, subWeeks, isSameDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { PDFExportDialog } from '@/components/PDFExportDialog';
 import GanttChart from '@/components/GanttChart';
+import { UpcomingAppointments } from '@/components/UpcomingAppointments';
 
 const Dashboard = () => {
   const {
@@ -63,22 +46,68 @@ const Dashboard = () => {
   const [showPDFDialog, setShowPDFDialog] = useState(false);
 
   // State for Gantt markers
-  const [markers, setMarkers] = useState<{ id: string; chantierId: string; date: string; endDate?: string; type: 'milestone' | 'appointment' | 'end-date' | 'custom' | 'range'; label: string }[]>(() => {
-    const stored = localStorage.getItem('gc_ganttMarkers');
-    return stored ? JSON.parse(stored) : [];
-  });
+  const [markers, setMarkers] = useState<{ id: string; chantierId: string; date: string; endDate?: string; type: 'milestone' | 'appointment' | 'end-date' | 'custom' | 'range'; label: string }[]>([]);
 
-  const handleAddMarker = (marker: Omit<{ id: string; chantierId: string; date: string; endDate?: string; type: 'milestone' | 'appointment' | 'end-date' | 'custom' | 'range'; label: string }, 'id'>) => {
-    const newMarker = { ...marker, id: Date.now().toString() };
-    const updatedMarkers = [...markers, newMarker];
-    setMarkers(updatedMarkers);
-    localStorage.setItem('gc_ganttMarkers', JSON.stringify(updatedMarkers));
+  // Load markers from Supabase on mount
+  useEffect(() => {
+    const loadMarkers = async () => {
+      const { data, error } = await supabase
+        .from('gantt_markers')
+        .select('*')
+        .order('date', { ascending: true });
+      if (error) {
+        console.error('Error loading markers:', error);
+        return;
+      }
+      if (data) {
+        const transformed = data.map((m) => ({
+          id: m.id,
+          chantierId: m.chantier_id,
+          date: m.date,
+          endDate: m.end_date || undefined,
+          type: m.type as any,
+          label: m.label,
+        }));
+        setMarkers(transformed);
+      }
+    };
+    loadMarkers();
+  }, []);
+
+  const handleAddMarker = async (marker: Omit<{ id: string; chantierId: string; date: string; endDate?: string; type: 'milestone' | 'appointment' | 'end-date' | 'custom' | 'range'; label: string }, 'id'>) => {
+    const dbMarker = {
+      chantier_id: marker.chantierId,
+      date: marker.date,
+      end_date: marker.endDate || null,
+      type: marker.type,
+      label: marker.label,
+      color: null,
+    };
+    const { data, error } = await supabase.from('gantt_markers').insert(dbMarker as any).select().single();
+    if (error) {
+      console.error('Error adding marker:', error);
+      return;
+    }
+    if (data) {
+      const newMarker = {
+        id: data.id,
+        chantierId: data.chantier_id,
+        date: data.date,
+        endDate: data.end_date || undefined,
+        type: data.type as any,
+        label: data.label,
+      };
+      setMarkers((prev) => [...prev, newMarker]);
+    }
   };
 
-  const handleDeleteMarker = (id: string) => {
-    const updatedMarkers = markers.filter((m) => m.id !== id);
-    setMarkers(updatedMarkers);
-    localStorage.setItem('gc_ganttMarkers', JSON.stringify(updatedMarkers));
+  const handleDeleteMarker = async (id: string) => {
+    const { error } = await supabase.from('gantt_markers').delete().eq('id', id);
+    if (error) {
+      console.error('Error deleting marker:', error);
+      return;
+    }
+    setMarkers((prev) => prev.filter((m) => m.id !== id));
   };
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
@@ -324,10 +353,19 @@ const Dashboard = () => {
         dailyHours: weekDays.map(day => {
           const dateStr = format(day, 'yyyy-MM-dd');
           const dayEntries = weekEntries.filter(e => e.date === dateStr);
+          const chantierHours = dayEntries
+            .filter(e => !e.hourCategoryId || !getHourCategoryById(e.hourCategoryId)?.isBureau)
+            .reduce((sum, e) => sum + e.heures, 0);
+          const bureauHours = dayEntries
+            .filter(e => e.hourCategoryId && getHourCategoryById(e.hourCategoryId)?.isBureau)
+            .reduce((sum, e) => sum + e.heures, 0);
           return {
             day,
             hours: dayEntries.reduce((sum, e) => sum + e.heures, 0),
-            hasEntries: dayEntries.length > 0
+            chantierHours,
+            bureauHours,
+            hasEntries: dayEntries.length > 0,
+            hasBureauEntries: bureauHours > 0
           };
         })
       };
@@ -338,7 +376,7 @@ const Dashboard = () => {
       if (priorityDiff !== 0) return priorityDiff;
       return a.employee.nom.localeCompare(b.employee.nom);
     });
-  }, [employees, timeEntries, weekDays]);
+  }, [employees, timeEntries, weekDays, getHourCategoryById]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -385,7 +423,7 @@ const Dashboard = () => {
       </div>
 
       {/* Monthly Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Heures du mois</CardTitle>
@@ -415,6 +453,9 @@ const Dashboard = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Upcoming Appointments Widget */}
+        <UpcomingAppointments markers={markers} chantiers={chantiers} maxItems={5} />
       </div>
 
       {/* Employee Weekly Status Table */}
@@ -454,11 +495,20 @@ const Dashboard = () => {
                     {empStatus.dailyHours.map((dayHours, index) => (
                       <TableCell key={index} className="text-center">
                         {dayHours.hasEntries ? (
-                          <span className="font-semibold text-primary">
-                            {formatHoursDecimalWithH(dayHours.hours)}
-                          </span>
+                          <div className="flex flex-col items-center gap-0.5">
+                            {dayHours.chantierHours > 0 && (
+                              <span className="font-semibold text-blue-500">
+                                {formatHoursDecimalWithH(dayHours.chantierHours)}
+                              </span>
+                            )}
+                            {dayHours.hasBureauEntries && (
+                              <span className="text-xs text-orange-500 font-medium">
+                                {formatHoursDecimalWithH(dayHours.bureauHours)}
+                              </span>
+                            )}
+                          </div>
                         ) : (
-                          <span className="text-red-500 font-bold">❌</span>
+                          <span className="text-red-500 font-bold">-</span>
                         )}
                       </TableCell>
                     ))}
