@@ -78,7 +78,9 @@ const Dashboard = () => {
   }, []);
 
   const handleAddMarker = async (marker: Omit<{ id: string; chantierId: string; date: string; endDate?: string; type: 'milestone' | 'appointment' | 'end-date' | 'custom' | 'range'; label: string }, 'id'>) => {
+    const newId = crypto.randomUUID();
     const dbMarker = {
+      id: newId,
       chantier_id: marker.chantierId,
       date: marker.date,
       end_date: marker.endDate || null,
@@ -86,6 +88,7 @@ const Dashboard = () => {
       label: marker.label,
       color: null,
     };
+    console.log('Inserting marker:', dbMarker);
     const { data, error } = await supabase.from('gantt_markers').insert(dbMarker as any).select().single();
     if (error) {
       console.error('Error adding marker:', error);
