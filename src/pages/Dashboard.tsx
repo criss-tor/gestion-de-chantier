@@ -51,6 +51,7 @@ const Dashboard = () => {
   // Load markers from Supabase on mount
   useEffect(() => {
     const loadMarkers = async () => {
+      console.log('Loading markers from Supabase...');
       const { data, error } = await supabase
         .from('gantt_markers')
         .select('*')
@@ -59,6 +60,7 @@ const Dashboard = () => {
         console.error('Error loading markers:', error);
         return;
       }
+      console.log('Markers loaded:', data);
       if (data) {
         const transformed = data.map((m) => ({
           id: m.id,
@@ -68,6 +70,7 @@ const Dashboard = () => {
           type: m.type as any,
           label: m.label,
         }));
+        console.log('Transformed markers:', transformed);
         setMarkers(transformed);
       }
     };
