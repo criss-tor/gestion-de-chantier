@@ -56,14 +56,15 @@ export default function Chantiers() {
 
   const totalHeures = chantierStats.reduce((sum, s) => sum + s.heures, 0);
 
-  const handleDeleteChantier = () => {
+  const handleDeleteChantier = async () => {
+    console.log('handleDeleteChantier called', { deletingChantier, confirmDelete });
     if (deletingChantier) {
       if (!confirmDelete) {
         // Première confirmation
         setConfirmDelete(true);
       } else {
         // Seconde confirmation - suppression effective
-        deleteChantier(deletingChantier);
+        await deleteChantier(deletingChantier);
         setDeletingChantier(null);
         setConfirmDelete(false);
       }
@@ -264,12 +265,21 @@ export default function Chantiers() {
             <AlertDialogCancel onClick={() => { setDeletingChantier(null); setConfirmDelete(false); }}>
               {confirmDelete ? "NON, ANNULER" : "Annuler"}
             </AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleDeleteChantier}
-              className={confirmDelete ? "bg-destructive hover:bg-destructive/90" : ""}
-            >
-              {confirmDelete ? "OUI, SUPPRIMER TOUT" : "Supprimer"}
-            </AlertDialogAction>
+            {confirmDelete ? (
+              <AlertDialogAction
+                onClick={handleDeleteChantier}
+                className="bg-destructive hover:bg-destructive/90"
+              >
+                OUI, SUPPRIMER TOUT
+              </AlertDialogAction>
+            ) : (
+              <Button
+                onClick={handleDeleteChantier}
+                className="bg-destructive hover:bg-destructive/90"
+              >
+                Supprimer
+              </Button>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

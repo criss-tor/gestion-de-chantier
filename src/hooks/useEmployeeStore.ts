@@ -225,9 +225,11 @@ export function useEmployeeStore() {
   }, [showError]);
 
   const deleteChantier = useCallback(async (id: string) => {
+    console.log('Début de suppression du chantier:', id);
     let previousChantiers: Chantier[] = [];
     let previousTimeEntries: TimeEntry[] = [];
     let previousMaterialCosts: MaterialCost[] = [];
+    
     setChantiers(prev => {
       previousChantiers = prev;
       return prev.filter(ch => ch.id !== id);
@@ -241,14 +243,29 @@ export function useEmployeeStore() {
       return prev.filter(cost => cost.chantierId !== id);
     });
 
-    const { error } = await supabase.from('chantiers').delete().eq('id', id);
-    if (error) {
+    try {
+      console.log('Appel Supabase pour supprimer:', id);
+      const { data, error } = await supabase.from('chantiers').delete().eq('id', id).select();
+      console.log('Réponse Supabase - Data:', data, 'Error:', error);
+      
+      if (error) {
+        console.error('Erreur Supabase détaillée:', error);
+        setChantiers(previousChantiers);
+        setTimeEntries(previousTimeEntries);
+        setMaterialCosts(previousMaterialCosts);
+        showError('Erreur de suppression', `Impossible de supprimer le chantier. ${error.message}`, error);
+      } else {
+        console.log('Chantier supprimé avec succès');
+        toast({ title: 'Succès', description: 'Chantier supprimé avec succès', variant: 'default' });
+      }
+    } catch (err) {
+      console.error('Exception lors de la suppression:', err);
       setChantiers(previousChantiers);
       setTimeEntries(previousTimeEntries);
       setMaterialCosts(previousMaterialCosts);
-      showError('Erreur', 'Impossible de supprimer le chantier.', error);
+      showError('Erreur', 'Une erreur inattendue est survenue.', err);
     }
-  }, [showError]);
+  }, [showError, toast]);
 
   const updateChantier = useCallback(async (id: string, updates: Partial<Chantier>) => {
     let previousChantiers: Chantier[] = [];
