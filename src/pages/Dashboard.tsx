@@ -483,11 +483,18 @@ const Dashboard = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Employé</TableHead>
-                  <TableHead className="text-center">Lun</TableHead>
-                  <TableHead className="text-center">Mar</TableHead>
-                  <TableHead className="text-center">Mer</TableHead>
-                  <TableHead className="text-center">Jeu</TableHead>
-                  <TableHead className="text-center">Ven</TableHead>
+                  {weekDays.map((day, index) => (
+                    <TableHead key={index} className="text-center">
+                      <div className="flex flex-col items-center gap-0.5">
+                        <span className="inline-flex h-5 min-w-[1.6rem] items-center justify-center rounded-full bg-primary/10 px-2 text-[10px] font-semibold uppercase text-primary">
+                          {format(day, 'd')}
+                        </span>
+                        <span className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                          {format(day, 'EEE', { locale: fr })}
+                        </span>
+                      </div>
+                    </TableHead>
+                  ))}
                   <TableHead className="text-right">Total</TableHead>
                   <TableHead className="text-center">Statut</TableHead>
                 </TableRow>
@@ -587,11 +594,12 @@ const Dashboard = () => {
               <CardHeader className="pb-2 pt-3 px-3">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm font-medium capitalize">
+                    <span className="text-xs text-muted-foreground mr-2">{format(day, 'd')}</span>
                     {format(day, 'EEEE', { locale: fr })}
                   </CardTitle>
                   {isToday(day) && <Badge variant="default" className="text-xs px-1.5 py-0">Aujourd'hui</Badge>}
                 </div>
-                <p className="text-lg font-bold">{format(day, 'd MMM', { locale: fr })}</p>
+                <p className="text-lg font-bold">{format(day, 'MMM', { locale: fr })}</p>
               </CardHeader>
               <CardContent className="px-3 pb-3 space-y-1.5">
                 {dayEntries.length === 0 ?

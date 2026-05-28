@@ -69,6 +69,7 @@ export default function Heures() {
   const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState('');
 
   // États pour la pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -128,10 +129,11 @@ export default function Heures() {
     // Validation des règles chantier/catégorie
     const validationError = validateEntry();
     if (!validationError.valid) {
-      alert(validationError.message);
+      setFormError(validationError.message);
       return;
     }
 
+    setFormError('');
     setIsSubmitting(true); // Démarrer le chargement
     
     const newEntry = {
@@ -186,48 +188,47 @@ export default function Heures() {
   // Fonction de validation pour les règles chantier/catégorie
   const validateEntry = () => {
     const selectedCategory = hourCategories.find(cat => cat.id === selectedHourCategoryId);
-    const categoryName = selectedCategory?.nom?.toLowerCase();
-    
-    // Cas 1: Aucun chantier ET aucune catégorie sélectionnées -> invalide
-    if (!selectedChantierId && !selectedHourCategoryId) {
-      return { valid: false, message: 'Vous devez sélectionner soit (chantier + catégorie Atelier/Pose/Dessin) soit (catégorie Divers/Absent)' };
+    const isBureauCategory = selectedCategory?.isBureau === true;
+
+    if (!selectedChantierId && !selectedCategory) {
+      return {
+        valid: false,
+        message: 'Vous devez sélectionner un chantier et une catégorie, ou une catégorie de bureau sans chantier.',
+      };
     }
-    
-    // Cas 2: Chantier sélectionné sans catégorie -> invalide
-    if (selectedChantierId && !selectedHourCategoryId) {
-      return { valid: false, message: 'Pour un chantier, une catégorie est obligatoire (Atelier, Pose ou Dessin)' };
+
+    if (selectedChantierId && !selectedCategory) {
+      return {
+        valid: false,
+        message: 'Pour un chantier, une catégorie est obligatoire.',
+      };
     }
-    
-    // Cas 3: Catégorie atelier/pose/dessin sans chantier -> invalide
-    if (categoryName && ['atelier', 'pose', 'dessin'].includes(categoryName) && !selectedChantierId) {
-      return { valid: false, message: 'Pour la catégorie ' + selectedCategory.nom + ', un chantier est obligatoire' };
+
+    if (selectedCategory && isBureauCategory && selectedChantierId) {
+      return {
+        valid: false,
+        message: 'Une catégorie de bureau ne doit pas être associée à un chantier.',
+      };
     }
-    
-    // Cas 4: Chantier sélectionné avec catégorie non valide -> invalide
-    if (selectedChantierId && categoryName && !['atelier', 'pose', 'dessin'].includes(categoryName)) {
-      return { valid: false, message: 'Pour un chantier, la catégorie doit être Atelier, Pose ou Dessin' };
+
+    if (selectedCategory && !isBureauCategory && !selectedChantierId) {
+      return {
+        valid: false,
+        message: 'Pour cette catégorie, vous devez sélectionner un chantier.',
+      };
     }
-    
-    // Cas 5: Catégorie divers/absent sans chantier -> valide
-    if (categoryName && ['divers', 'absent'].includes(categoryName) && !selectedChantierId) {
-      return { valid: true, message: '' };
-    }
-    
-    // Cas 6: Chantier + catégorie atelier/pose/dessin -> valide
-    if (selectedChantierId && categoryName && ['atelier', 'pose', 'dessin'].includes(categoryName)) {
-      return { valid: true, message: '' };
-    }
-    
+
     return { valid: true, message: '' };
   };
 
   const handleUpdateEntry = async () => {
     const validationError = validateEntry();
     if (!validationError.valid) {
-      alert(validationError.message);
+      setFormError(validationError.message);
       return;
     }
 
+    setFormError('');
     if (!editingEntry || !selectedEmployeeId || !entryDate) return;
 
     const totalHours = parseFloat(entryHeures || '0') + (parseFloat(entryMinutes || '0')) / 60;
@@ -429,6 +430,11 @@ export default function Heures() {
               )}
             </Button>
           </div>
+          {formError && (
+            <div className="mt-3 rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+              {formError}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -454,7 +460,14 @@ export default function Heures() {
               <div className="space-y-2">
                 {weekDays.map((day, index) => (
                   <div key={index} className="flex justify-between items-center">
-                    <span className="text-sm">{format(day, 'EEEE', { locale: fr })}</span>
+                    <div className="flex items-baseline gap-2">
+                      <span className="inline-flex h-5 min-w-[1.6rem] items-center justify-center rounded-full bg-primary/10 px-2 text-[10px] font-semibold uppercase text-primary">
+                        {format(day, 'd')}
+                      </span>
+                      <span className="text-sm font-semibold capitalize text-primary">
+                        {format(day, 'EEEE', { locale: fr })}
+                      </span>
+                    </div>
                     <span className="font-medium">{formatHoursDecimalWithH(hoursByDay[index].total)}</span>
                   </div>
                 ))}
