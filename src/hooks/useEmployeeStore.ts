@@ -43,17 +43,13 @@ export function useEmployeeStore() {
         localStorage.setItem('gc_last_cleanup_date', today);
       }
 
-      // [OPTIMIZATION] Charger SEULEMENT les données du mois courant pour réduire Disk IO
-      const now = new Date();
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
-
+      // Charger TOUTES les données pour afficher l'historique complet
       const [empRes, catRes, chRes, teRes, mcRes] = await Promise.all([
         supabase.from('employees').select('*').limit(500),
         supabase.from('hour_categories').select('*').limit(500),
         supabase.from('chantiers').select('*').limit(500),
-        supabase.from('time_entries').select('*').gte('date', monthStart).lte('date', monthEnd).limit(500),
-        supabase.from('material_costs').select('*').gte('date', monthStart).lte('date', monthEnd).limit(500),
+        supabase.from('time_entries').select('*').limit(1000),
+        supabase.from('material_costs').select('*').limit(1000),
       ]);
 
       if (empRes.error || catRes.error || chRes.error || teRes.error || mcRes.error) {
