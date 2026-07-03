@@ -1,10 +1,14 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { Employee, TimeEntry, Chantier, MaterialCost, ChantierStats, HourCategory } from '@/types/employee';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { offlineStorage } from '@/lib/offlineStorage';
+import { cleanupOrphanedTimeEntries } from '@/lib/cleanupOrphanedData';
+import { scheduleMonthlyCleanup, checkDataSize } from '@/lib/dataCleanup';
 
 export function useEmployeeStore() {
   const { toast } = useToast();
+  const initializerRef = useRef(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [currentEmployeeId, setCurrentEmployeeId] = useState<string | null>(() => {
     const stored = window.localStorage.getItem('gc_currentEmployeeId');
@@ -29,12 +33,27 @@ export function useEmployeeStore() {
   const loadAllData = useCallback(async () => {
     setLoading(true);
     try {
+      // Exécuter le nettoyage une fois par jour (automatique en arrière-plan)
+      const lastCleanupDate = localStorage.getItem('gc_last_cleanup_date');
+      const today = new Date().toISOString().split('T')[0];
+      
+      if (lastCleanupDate !== today) {
+        console.log('🧹 Exécution du nettoyage automatique...');
+        await cleanupOrphanedTimeEntries();
+        localStorage.setItem('gc_last_cleanup_date', today);
+      }
+
+      // [OPTIMIZATION] Charger SEULEMENT les données du mois courant pour réduire Disk IO
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+
       const [empRes, catRes, chRes, teRes, mcRes] = await Promise.all([
-        supabase.from('employees').select('*'),
-        supabase.from('hour_categories').select('*'),
-        supabase.from('chantiers').select('*'),
-        supabase.from('time_entries').select('*'),
-        supabase.from('material_costs').select('*'),
+        supabase.from('employees').select('*').limit(500),
+        supabase.from('hour_categories').select('*').limit(500),
+        supabase.from('chantiers').select('*').limit(500),
+        supabase.from('time_entries').select('*').gte('date', monthStart).lte('date', monthEnd).limit(500),
+        supabase.from('material_costs').select('*').gte('date', monthStart).lte('date', monthEnd).limit(500),
       ]);
 
       if (empRes.error || catRes.error || chRes.error || teRes.error || mcRes.error) {
@@ -59,7 +78,14 @@ export function useEmployeeStore() {
         devis: c.devis !== undefined && c.devis !== null ? Number(c.devis) : 0,
         heuresPrevues: c.heures_prevues !== undefined && c.heures_prevues !== null ? Number(c.heures_prevues) : 0,
       })));
-      setTimeEntries((teRes.data || []).map(e => ({ id: e.id, employeeId: e.employee_id, chantierId: e.chantier_id || undefined, date: e.date, heures: Number(e.heures), description: e.description || undefined, hourCategoryId: e.hour_category_id || undefined })));
+      
+      // Récupérer les entrées Supabase
+      const supabaseTimeEntries = (teRes.data || []).map(e => ({ id: e.id, employeeId: e.employee_id, chantierId: e.chantier_id || undefined, date: e.date, heures: Number(e.heures), description: e.description || undefined, hourCategoryId: e.hour_category_id || undefined }));
+      
+      // Fusionner avec les entrées hors-ligne
+      const mergedTimeEntries = offlineStorage.mergeTimeEntries(supabaseTimeEntries);
+      setTimeEntries(mergedTimeEntries);
+      
       setMaterialCosts((mcRes.data || []).map(c => ({ id: c.id, chantierId: c.chantier_id, date: c.date, montant: Number(c.montant), description: c.description })));
     } catch (error) {
       showError('Erreur de chargement', 'Impossible de charger les données de l’application.', error);
@@ -68,10 +94,17 @@ export function useEmployeeStore() {
     }
   }, [showError]);
 
-  // Load all data on mount
+  // Load all data on mount (once only, not in a loop)
   useEffect(() => {
-    loadAllData();
-  }, [loadAllData]);
+    if (!initializerRef.current) {
+      initializerRef.current = true;
+      console.log('[Init] Starting first load...');
+      loadAllData();
+      // Vérifier la taille des données et planifier un nettoyage si nécessaire
+      checkDataSize();
+      scheduleMonthlyCleanup();
+    }
+  }, []);
 
   const addEmployee = useCallback(async (employee: Omit<Employee, 'id'>) => {
     const id = Date.now().toString();
@@ -168,7 +201,17 @@ export function useEmployeeStore() {
       showError('Erreur', 'Impossible d’ajouter la saisie horaire.', error);
     }
   }, [showError]);
-
+  // Ajouter une entrée en mode hors-ligne (l'ajoute localement ET la sauvegarde pour synchronisation)
+  const addTimeEntryOffline = useCallback((entry: Omit<TimeEntry, 'id'>) => {
+    const id = `offline_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const newEntry: TimeEntry = { ...entry, id };
+    
+    // Ajouter immédiatement à l'état local
+    setTimeEntries(prev => [...prev, newEntry]);
+    
+    // Sauvegarder pour synchronisation ultérieure
+    offlineStorage.addLocalTimeEntry(newEntry);
+  }, []);
   const updateTimeEntry = useCallback(async (id: string, updates: Partial<TimeEntry>) => {
     let previousTimeEntries: TimeEntry[] = [];
     setTimeEntries(prev => {
@@ -465,13 +508,21 @@ export function useEmployeeStore() {
     [getEmployeeById, getHourCategoryById]
   );
 
-  const getTotalCostForEmployee = useCallback(
-    (employeeId: string) => {
-      return timeEntries
-        .filter(entry => entry.employeeId === employeeId)
+  // Pré-calculer les coûts pour éviter des recalculs constants
+  const employeeCostCache = useMemo(() => {
+    const cache = new Map<string, number>();
+    employees.forEach(emp => {
+      const cost = timeEntries
+        .filter(entry => entry.employeeId === emp.id)
         .reduce((sum, entry) => sum + getEntryCost(entry), 0);
-    },
-    [timeEntries, getEntryCost]
+      cache.set(emp.id, cost);
+    });
+    return cache;
+  }, [employees, timeEntries, getEntryCost]);
+
+  const getTotalCostForEmployee = useCallback(
+    (employeeId: string) => employeeCostCache.get(employeeId) ?? 0,
+    [employeeCostCache]
   );
 
   const chantierStats = useMemo((): ChantierStats[] => {
@@ -528,6 +579,7 @@ export function useEmployeeStore() {
     updateEmployee,
     deleteEmployee,
     addTimeEntry,
+    addTimeEntryOffline,
     updateTimeEntry,
     deleteTimeEntry,
     addChantier,

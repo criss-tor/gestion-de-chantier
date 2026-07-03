@@ -95,6 +95,15 @@ export class OfflineStorage {
     return data ? data.timeEntries : [];
   }
 
+  // Fusionner les entrées hors-ligne avec les entrées Supabase
+  mergeTimeEntries(supabaseEntries: TimeEntry[]): TimeEntry[] {
+    const offlineEntries = this.getOfflineTimeEntries();
+    const supabaseIds = new Set(supabaseEntries.map(e => e.id));
+    // Ajouter seulement les entrées hors-ligne qui ne sont pas déjà dans Supabase
+    const uniqueOfflineEntries = offlineEntries.filter(e => !supabaseIds.has(e.id));
+    return [...supabaseEntries, ...uniqueOfflineEntries];
+  }
+
   // Ajouter une entrée localement
   addLocalTimeEntry(entry: TimeEntry): void {
     const data = this.getOfflineData() || { timeEntries: [], pendingActions: [], lastSync: '' };

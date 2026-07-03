@@ -41,6 +41,7 @@ export default function Heures() {
     timeEntries,
     hourCategories,
     addTimeEntry,
+    addTimeEntryOffline,
     updateTimeEntry,
     deleteTimeEntry,
     currentEmployeeId,
@@ -54,7 +55,6 @@ export default function Heures() {
     isSyncing,
     lastSync,
     syncPendingData,
-    addTimeEntryOffline,
     needsSync
   } = useOfflineSync();
 
@@ -137,7 +137,6 @@ export default function Heures() {
     setIsSubmitting(true); // Démarrer le chargement
     
     const newEntry = {
-      id: Date.now().toString(),
       employeeId: selectedEmployeeId,
       chantierId: selectedChantierId || null,
       hourCategoryId: selectedHourCategoryId || null,
