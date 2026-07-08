@@ -86,19 +86,19 @@ export function useEmployeeStore() {
       
       setMaterialCosts((mcRes.data || []).map(c => ({ id: c.id, chantierId: c.chantier_id, date: c.date, montant: Number(c.montant), description: c.description })));
 
-      // Maintenance légère : uniquement pour les admins, max 1×/jour
-      const storedEmployeeId = window.localStorage.getItem('gc_currentEmployeeId');
-      const currentUser = storedEmployeeId ? mappedEmployees.find(e => e.id === storedEmployeeId) : null;
-      const isAdminSession = !currentUser || currentUser.role === 'admin';
-      if (isAdminSession) {
-        const today = new Date().toISOString().split('T')[0];
-        const lastSizeCheck = window.localStorage.getItem('gc_last_size_check_date');
-        if (lastSizeCheck !== today) {
-          checkDataSize();
-          window.localStorage.setItem('gc_last_size_check_date', today);
-        }
-        scheduleMonthlyCleanup();
-      }
+      // Maintenance désactivée pour réduire les lectures Supabase
+      // const storedEmployeeId = window.localStorage.getItem('gc_currentEmployeeId');
+      // const currentUser = storedEmployeeId ? mappedEmployees.find(e => e.id === storedEmployeeId) : null;
+      // const isAdminSession = !currentUser || currentUser.role === 'admin';
+      // if (isAdminSession) {
+      //   const today = new Date().toISOString().split('T')[0];
+      //   const lastSizeCheck = window.localStorage.getItem('gc_last_size_check_date');
+      //   if (lastSizeCheck !== today) {
+      //     checkDataSize();
+      //     window.localStorage.setItem('gc_last_size_check_date', today);
+      //   }
+      //   scheduleMonthlyCleanup();
+      // }
     } catch (error) {
       showError('Erreur de chargement', 'Impossible de charger les données de l’application.', error);
     } finally {
