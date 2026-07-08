@@ -84,7 +84,7 @@ export async function checkDataSize() {
  * Planifie un nettoyage automatique une fois par mois
  */
 export function scheduleMonthlyCleanup() {
-  const lastCleanupKey = 'gc_last_cleanup_date';
+  const lastCleanupKey = 'gc_last_monthly_cleanup_date';
   const lastCleanup = localStorage.getItem(lastCleanupKey);
   const today = new Date().toISOString().split('T')[0];
   

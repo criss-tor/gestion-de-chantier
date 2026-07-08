@@ -1,10 +1,14 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { subMonths } from 'date-fns';
 import { Employee, TimeEntry, Chantier, MaterialCost, ChantierStats, HourCategory } from '@/types/employee';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { offlineStorage } from '@/lib/offlineStorage';
-import { cleanupOrphanedTimeEntries } from '@/lib/cleanupOrphanedData';
 import { scheduleMonthlyCleanup, checkDataSize } from '@/lib/dataCleanup';
+
+/** Fenêtre de chargement : limite la mémoire côté Supabase (derniers 18 mois). */
+const DATA_RETENTION_MONTHS = 18;
+const getRetentionDate = () => subMonths(new Date(), DATA_RETENTION_MONTHS).toISOString().split('T')[0];
 
 export function useEmployeeStore() {
   const { toast } = useToast();
@@ -33,37 +37,36 @@ export function useEmployeeStore() {
   const loadAllData = useCallback(async () => {
     setLoading(true);
     try {
-      // Exécuter le nettoyage une fois par jour (automatique en arrière-plan)
-      const lastCleanupDate = localStorage.getItem('gc_last_cleanup_date');
-      const today = new Date().toISOString().split('T')[0];
-      
-      if (lastCleanupDate !== today) {
-        console.log('🧹 Exécution du nettoyage automatique...');
-        await cleanupOrphanedTimeEntries();
-        localStorage.setItem('gc_last_cleanup_date', today);
-      }
-
-      // Charger TOUTES les données pour afficher l'historique complet
+      // Charger toutes les données sans filtre de date pour afficher toutes les heures
       const [empRes, catRes, chRes, teRes, mcRes] = await Promise.all([
-        supabase.from('employees').select('*').limit(500),
-        supabase.from('hour_categories').select('*').limit(500),
-        supabase.from('chantiers').select('*').limit(500),
-        supabase.from('time_entries').select('*').limit(1000),
-        supabase.from('material_costs').select('*').limit(1000),
+        supabase.from('employees').select('id, nom, prenom, cout_horaire, role, pin').limit(200),
+        supabase.from('hour_categories').select('id, nom, pourcentage, is_bureau').limit(50),
+        supabase.from('chantiers').select('id, nom, description, devis, heures_prevues').limit(200),
+        supabase
+          .from('time_entries')
+          .select('id, employee_id, chantier_id, date, heures, description, hour_category_id')
+          .order('date', { ascending: false })
+          .limit(5000),
+        supabase
+          .from('material_costs')
+          .select('id, chantier_id, date, montant, description')
+          .order('date', { ascending: false })
+          .limit(2000),
       ]);
 
       if (empRes.error || catRes.error || chRes.error || teRes.error || mcRes.error) {
         showError('Erreur de chargement', 'Impossible de récupérer certaines données depuis Supabase.');
       }
 
-      setEmployees((empRes.data || []).map((e: { id: string; nom: string; prenom: string; cout_horaire: number; role?: string; pin?: string }) => ({ 
-        id: e.id, 
-        nom: e.nom, 
-        prenom: e.prenom, 
-        coutHoraire: Number(e.cout_horaire), 
-        role: e.role || 'employe', 
-        pin: e.pin || '0000' 
-      })));
+      const mappedEmployees = (empRes.data || []).map((e: { id: string; nom: string; prenom: string; cout_horaire: number; role?: string; pin?: string }) => ({
+        id: e.id,
+        nom: e.nom,
+        prenom: e.prenom,
+        coutHoraire: Number(e.cout_horaire),
+        role: e.role || 'employe',
+        pin: e.pin || '0000',
+      }));
+      setEmployees(mappedEmployees);
       const fetchedCategories = (catRes.data || []).map(c => ({ id: c.id, nom: c.nom, pourcentage: Number(c.pourcentage), isBureau: c.is_bureau }));
       setHourCategories(fetchedCategories);
 
@@ -78,11 +81,24 @@ export function useEmployeeStore() {
       // Récupérer les entrées Supabase
       const supabaseTimeEntries = (teRes.data || []).map(e => ({ id: e.id, employeeId: e.employee_id, chantierId: e.chantier_id || undefined, date: e.date, heures: Number(e.heures), description: e.description || undefined, hourCategoryId: e.hour_category_id || undefined }));
       
-      // Fusionner avec les entrées hors-ligne
-      const mergedTimeEntries = offlineStorage.mergeTimeEntries(supabaseTimeEntries);
-      setTimeEntries(mergedTimeEntries);
+      // Utiliser uniquement les données Supabase pour éviter les problèmes de synchronisation
+      setTimeEntries(supabaseTimeEntries);
       
       setMaterialCosts((mcRes.data || []).map(c => ({ id: c.id, chantierId: c.chantier_id, date: c.date, montant: Number(c.montant), description: c.description })));
+
+      // Maintenance légère : uniquement pour les admins, max 1×/jour
+      const storedEmployeeId = window.localStorage.getItem('gc_currentEmployeeId');
+      const currentUser = storedEmployeeId ? mappedEmployees.find(e => e.id === storedEmployeeId) : null;
+      const isAdminSession = !currentUser || currentUser.role === 'admin';
+      if (isAdminSession) {
+        const today = new Date().toISOString().split('T')[0];
+        const lastSizeCheck = window.localStorage.getItem('gc_last_size_check_date');
+        if (lastSizeCheck !== today) {
+          checkDataSize();
+          window.localStorage.setItem('gc_last_size_check_date', today);
+        }
+        scheduleMonthlyCleanup();
+      }
     } catch (error) {
       showError('Erreur de chargement', 'Impossible de charger les données de l’application.', error);
     } finally {
@@ -94,11 +110,7 @@ export function useEmployeeStore() {
   useEffect(() => {
     if (!initializerRef.current) {
       initializerRef.current = true;
-      console.log('[Init] Starting first load...');
       loadAllData();
-      // Vérifier la taille des données et planifier un nettoyage si nécessaire
-      checkDataSize();
-      scheduleMonthlyCleanup();
     }
   }, []);
 
@@ -566,6 +578,7 @@ export function useEmployeeStore() {
     setCurrentEmployee,
     hasConnected,
     logout,
+    loading,
     employeesLoading: loading,
     timeEntries,
     chantiers,

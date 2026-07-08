@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
@@ -18,30 +18,30 @@ export function Layout() {
   const { toast } = useToast();
   const [ganttMarkers, setGanttMarkers] = useState<{ id: string; chantierId: string; date: string; endDate?: string; type: 'milestone' | 'appointment' | 'end-date' | 'custom' | 'range'; label: string }[]>([]);
 
-  // Load markers from Supabase
-  useEffect(() => {
-    const loadMarkers = async () => {
-      const { data, error } = await supabase.from('gantt_markers').select('*').order('date', { ascending: true });
-      if (error) {
-        console.error('Error loading markers:', error);
-        return;
-      }
-      if (data) {
-        setGanttMarkers(data.map(m => ({
-          id: m.id,
-          chantierId: m.chantier_id,
-          date: m.date,
-          endDate: m.end_date || undefined,
-          type: m.type as any,
-          label: m.label
-        })));
-      }
-    };
-    loadMarkers();
-  }, []);
+  const loadGanttMarkers = async () => {
+    const { data, error } = await supabase
+      .from('gantt_markers')
+      .select('id, chantier_id, date, end_date, type, label')
+      .order('date', { ascending: true });
+    if (error) {
+      console.error('Error loading markers:', error);
+      return ganttMarkers;
+    }
+    const markers = (data || []).map(m => ({
+      id: m.id,
+      chantierId: m.chantier_id,
+      date: m.date,
+      endDate: m.end_date || undefined,
+      type: m.type as 'milestone' | 'appointment' | 'end-date' | 'custom' | 'range',
+      label: m.label
+    }));
+    setGanttMarkers(markers);
+    return markers;
+  };
 
-  const handleExport = () => {
-    exportBackup({ employees, timeEntries, chantiers, materialCosts, hourCategories, ganttMarkers });
+  const handleExport = async () => {
+    const markers = ganttMarkers.length > 0 ? ganttMarkers : await loadGanttMarkers();
+    exportBackup({ employees, timeEntries, chantiers, materialCosts, hourCategories, ganttMarkers: markers });
     toast({ title: 'Sauvegarde exportée', description: 'Le fichier Excel a été téléchargé.' });
   };
 
