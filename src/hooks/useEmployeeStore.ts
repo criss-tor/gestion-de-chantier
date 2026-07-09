@@ -37,28 +37,10 @@ export function useEmployeeStore() {
   const loadAllData = useCallback(async () => {
     setLoading(true);
     try {
-      // Charger toutes les données sans filtre de date pour afficher toutes les heures
-      const [empRes, catRes, chRes, teRes, mcRes] = await Promise.all([
-        supabase.from('employees').select('id, nom, prenom, cout_horaire, role, pin').limit(200),
-        supabase.from('hour_categories').select('id, nom, pourcentage, is_bureau').limit(50),
-        supabase.from('chantiers').select('id, nom, description, devis, heures_prevues').limit(200),
-        supabase
-          .from('time_entries')
-          .select('id, employee_id, chantier_id, date, heures, description, hour_category_id')
-          .order('date', { ascending: false })
-          .limit(5000),
-        supabase
-          .from('material_costs')
-          .select('id, chantier_id, date, montant, description')
-          .order('date', { ascending: false })
-          .limit(2000),
-      ]);
-
-      if (empRes.error || catRes.error || chRes.error || teRes.error || mcRes.error) {
-        showError('Erreur de chargement', 'Impossible de récupérer certaines données depuis Supabase.');
-      }
-
-      const mappedEmployees = (empRes.data || []).map((e: { id: string; nom: string; prenom: string; cout_horaire: number; role?: string; pin?: string }) => ({
+      // Charger d'abord les employés
+      const empRes = await supabase.from('employees').select('*').limit(200);
+      
+      const mappedEmployees = (empRes.data || []).map((e: any) => ({
         id: e.id,
         nom: e.nom,
         prenom: e.prenom,
@@ -67,6 +49,42 @@ export function useEmployeeStore() {
         pin: e.pin || '0000',
       }));
       setEmployees(mappedEmployees);
+
+      // Déterminer si c'est une session admin (vérifier le rôle de l'employé connecté)
+      const storedEmployeeId = window.localStorage.getItem('gc_currentEmployeeId');
+      const currentUser = storedEmployeeId ? mappedEmployees.find(e => e.id === storedEmployeeId) : null;
+      const isAdminSession = !currentUser || currentUser.role === 'admin';
+
+      // Pour les employés : 2 derniers mois, pour les admins : toutes les données (sans limite de date)
+      const retentionDate = isAdminSession 
+        ? undefined // Pas de filtre de date pour les admins
+        : subMonths(new Date(), 2).toISOString().split('T')[0];
+
+      // Limites adaptées au rôle
+      const timeEntriesLimit = isAdminSession ? 5000 : 200;
+      const materialCostsLimit = isAdminSession ? 2000 : 100;
+
+      const [catRes, chRes, teRes, mcRes] = await Promise.all([
+        supabase.from('hour_categories').select('id, nom, pourcentage, is_bureau').limit(50),
+        supabase.from('chantiers').select('id, nom, description, devis, heures_prevues').limit(200),
+        supabase
+          .from('time_entries')
+          .select('id, employee_id, chantier_id, date, heures, description, hour_category_id')
+          .gte('date', retentionDate || '2000-01-01')
+          .order('date', { ascending: false })
+          .limit(timeEntriesLimit),
+        supabase
+          .from('material_costs')
+          .select('id, chantier_id, date, montant, description')
+          .gte('date', retentionDate || '2000-01-01')
+          .order('date', { ascending: false })
+          .limit(materialCostsLimit),
+      ]);
+
+      if (empRes.error || catRes.error || chRes.error || teRes.error || mcRes.error) {
+        showError('Erreur de chargement', 'Impossible de récupérer certaines données depuis Supabase.');
+      }
+
       const fetchedCategories = (catRes.data || []).map(c => ({ id: c.id, nom: c.nom, pourcentage: Number(c.pourcentage), isBureau: c.is_bureau }));
       setHourCategories(fetchedCategories);
 
